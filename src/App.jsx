@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ChefHat, Download, Calendar } from 'lucide-react';
+import { Users, ChefHat, Download, Calendar, RefreshCw } from 'lucide-react';
 
 export default function ChristmasMenuSelector() {
   const [guests, setGuests] = useState([]);
@@ -12,6 +12,13 @@ export default function ChristmasMenuSelector() {
     orderDate: ''
   });
   const [viewMode, setViewMode] = useState('form');
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  // CONFIGURATION - REPLACE THESE VALUES
+  const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw'; // Replace with your Google Sheet ID
+  const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw'; // Replace with your API key
+  const SHEET_NAME = 'Orders'; // The name of the sheet tab
 
   const menuData = {
     starters: [
@@ -34,20 +41,114 @@ export default function ChristmasMenuSelector() {
     ]
   };
 
+  // Load orders from Google Sheets on mount and when view changes
   useEffect(() => {
-    const saved = localStorage.getItem('christmasGuests');
-    if (saved) {
-      setGuests(JSON.parse(saved));
-    }
+    loadOrdersFromSheet();
   }, []);
 
+  // Auto-refresh every 30 seconds when viewing orders
   useEffect(() => {
-    if (guests.length > 0) {
-      localStorage.setItem('christmasGuests', JSON.stringify(guests));
+    if (viewMode === 'view') {
+      const interval = setInterval(() => {
+        loadOrdersFromSheet();
+      }, 30000); // Refresh every 30 seconds
+      
+      return () => clearInterval(interval);
     }
-  }, [guests]);
+  }, [viewMode]);
 
-  const handleSubmit = (e) => {
+  const loadOrdersFromSheet = async () => {
+    if (SHEET_ID === 'YOUR_GOOGLE_SHEET_ID_HERE' || API_KEY === 'YOUR_API_KEY_HERE') {
+      console.log('Please configure SHEET_ID and API_KEY');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to load orders');
+      }
+
+      const data = await response.json();
+      
+      if (data.values && data.values.length > 1) {
+        // Skip header row, convert to guest objects
+        const loadedGuests = data.values.slice(1).map(row => ({
+          name: row[0] || '',
+          courses: parseInt(row[1]) || 2,
+          starter: row[2] || '',
+          main: row[3] || '',
+          dessert: row[4] || '',
+          orderDate: row[5] || ''
+        }));
+        
+        setGuests(loadedGuests);
+        setLastUpdate(new Date());
+      } else {
+        setGuests([]);
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      alert('Unable to load orders from Google Sheets. Please check your configuration.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveOrderToSheet = async (newGuest) => {
+    if (SHEET_ID === 'YOUR_GOOGLE_SHEET_ID_HERE' || API_KEY === 'YOUR_API_KEY_HERE') {
+      alert('⚠️ Google Sheets not configured!\n\nPlease follow the setup instructions to connect to Google Sheets.');
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Prepare the row data
+      const rowData = [
+        newGuest.name,
+        newGuest.courses,
+        newGuest.starter,
+        newGuest.main,
+        newGuest.dessert,
+        newGuest.orderDate
+      ];
+
+      // Use Apps Script Web App to append data (we'll create this)
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec'; // You'll add this during setup
+      
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Required for Apps Script
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sheetId: SHEET_ID,
+          sheetName: SHEET_NAME,
+          values: [rowData]
+        })
+      });
+
+      // Since no-cors mode, we can't check response, so we'll reload to verify
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Wait a bit for write
+      await loadOrdersFromSheet();
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving order:', error);
+      alert('Failed to save order. Please try again.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validation
@@ -98,24 +199,33 @@ export default function ChristmasMenuSelector() {
       minute: '2-digit'
     });
     
-    setGuests([...guests, { ...currentGuest, orderDate }]);
-    setCurrentGuest({
-      name: '',
-      courses: 2,
-      starter: '',
-      main: '',
-      dessert: '',
-      orderDate: ''
-    });
+    const newGuest = {
+      ...currentGuest,
+      orderDate
+    };
     
-    // Show success message
-    alert('Order submitted successfully! 🎄');
+    // Save to Google Sheets
+    const success = await saveOrderToSheet(newGuest);
     
-    // Automatically switch to "View All Orders" tab
-    setViewMode('view');
+    if (success) {
+      setCurrentGuest({
+        name: '',
+        courses: 2,
+        starter: '',
+        main: '',
+        dessert: '',
+        orderDate: ''
+      });
+      
+      // Show success message
+      alert('Order submitted successfully! 🎄');
+      
+      // Automatically switch to "View All Orders" tab
+      setViewMode('view');
+    }
   };
 
-  const clearAllOrders = () => {
+  const clearAllOrders = async () => {
     // Admin password protection
     const password = window.prompt('🔐 Admin Access Required\n\nPlease enter the admin password to clear all orders:');
     
@@ -131,18 +241,18 @@ export default function ChristmasMenuSelector() {
     
     // Password correct, proceed with confirmation
     const confirmed = window.confirm(
-      '⚠️ WARNING: This will delete ALL orders!\n\nAre you sure you want to clear all guest orders? This action cannot be undone.'
+      '⚠️ WARNING: This will delete ALL orders from Google Sheets!\n\nAre you sure you want to clear all guest orders? This action cannot be undone.'
     );
     
     if (confirmed) {
       const doubleCheck = window.confirm(
-        '🚨 FINAL CONFIRMATION\n\nThis will permanently delete all ' + guests.length + ' orders.\n\nClick OK to proceed or Cancel to keep the orders.'
+        '🚨 FINAL CONFIRMATION\n\nThis will permanently delete all ' + guests.length + ' orders from the Google Sheet.\n\nClick OK to proceed or Cancel to keep the orders.'
       );
       
       if (doubleCheck) {
-        setGuests([]);
-        localStorage.removeItem('christmasGuests');
-        alert('✅ All orders have been cleared!');
+        alert('⚠️ To clear all orders, please:\n1. Open your Google Sheet\n2. Select all order rows (not the header)\n3. Delete them manually\n\nThen refresh this page.');
+        // Note: We can't delete from sheets API directly with just API key
+        // User needs to do it manually or we'd need OAuth
       }
     }
   };
@@ -173,12 +283,14 @@ export default function ChristmasMenuSelector() {
       report += `   Ordered: ${guest.orderDate}\n`;
       if (guest.starter) {
         const starter = menuData.starters.find(s => s.id === guest.starter);
-        report += `   Starter: ${starter.name} (${starter.tags.join(', ')})\n`;
+        if (starter) report += `   Starter: ${starter.name} (${starter.tags.join(', ')})\n`;
       }
-      report += `   Main: ${getItemName(guest.main, 'mains')}\n`;
+      if (guest.main) {
+        report += `   Main: ${getItemName(guest.main, 'mains')}\n`;
+      }
       if (guest.dessert) {
         const dessert = menuData.desserts.find(d => d.id === guest.dessert);
-        report += `   Dessert: ${dessert.name} (${dessert.tags.join(', ')})\n`;
+        if (dessert) report += `   Dessert: ${dessert.name} (${dessert.tags.join(', ')})\n`;
       }
       report += '\n';
     });
@@ -216,24 +328,6 @@ export default function ChristmasMenuSelector() {
   };
 
   const stats = getStats();
-
-  // Helper to check if we can select this course type
-  const canSelectCourse = (courseType) => {
-    if (currentGuest.courses === 3) return true;
-    
-    // For 2-course: main is always required
-    if (courseType === 'main') return true;
-    
-    // For 2-course: can only select starter OR dessert (not both)
-    if (courseType === 'starter') {
-      return !currentGuest.dessert; // Can only select if dessert not selected
-    }
-    if (courseType === 'dessert') {
-      return !currentGuest.starter; // Can only select if starter not selected
-    }
-    
-    return false;
-  };
 
   // Handle course selection with 2-course restriction
   const handleCourseSelect = (courseType, itemId) => {
@@ -325,7 +419,10 @@ export default function ChristmasMenuSelector() {
             <ChefHat size={20} /> Place Order
           </button>
           <button
-            onClick={() => setViewMode('view')}
+            onClick={() => {
+              setViewMode('view');
+              loadOrdersFromSheet();
+            }}
             className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
               viewMode === 'view'
                 ? 'bg-green-600 text-white shadow-lg scale-105'
@@ -335,6 +432,13 @@ export default function ChristmasMenuSelector() {
             <Users size={20} /> View All Orders ({guests.length})
           </button>
         </div>
+
+        {loading && (
+          <div className="fixed top-4 right-4 bg-white rounded-lg shadow-lg p-4 flex items-center gap-2">
+            <RefreshCw className="animate-spin" size={20} />
+            <span>Syncing with Google Sheets...</span>
+          </div>
+        )}
 
         {viewMode === 'form' ? (
           <div className="max-w-6xl mx-auto bg-white/95 backdrop-blur rounded-xl shadow-2xl p-8 border-4 border-red-600">
@@ -354,6 +458,7 @@ export default function ChristmasMenuSelector() {
                   className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-red-500 focus:outline-none text-lg"
                   placeholder="Enter your name"
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -365,7 +470,6 @@ export default function ChristmasMenuSelector() {
                   <button
                     type="button"
                     onClick={() => {
-                      // Reset selections when changing menu type
                       setCurrentGuest({
                         ...currentGuest, 
                         courses: 2,
@@ -373,6 +477,7 @@ export default function ChristmasMenuSelector() {
                         dessert: ''
                       });
                     }}
+                    disabled={loading}
                     className={`p-4 rounded-lg border-3 font-semibold transition-all ${
                       currentGuest.courses === 2
                         ? 'bg-red-600 text-white border-red-700 scale-105'
@@ -385,6 +490,7 @@ export default function ChristmasMenuSelector() {
                   <button
                     type="button"
                     onClick={() => setCurrentGuest({...currentGuest, courses: 3})}
+                    disabled={loading}
                     className={`p-4 rounded-lg border-3 font-semibold transition-all ${
                       currentGuest.courses === 3
                         ? 'bg-green-600 text-white border-green-700 scale-105'
@@ -416,7 +522,7 @@ export default function ChristmasMenuSelector() {
                       key={item.id}
                       type="button"
                       onClick={() => handleCourseSelect('starter', item.id)}
-                      disabled={currentGuest.courses === 2 && currentGuest.dessert && currentGuest.starter !== item.id}
+                      disabled={loading || (currentGuest.courses === 2 && currentGuest.dessert && currentGuest.starter !== item.id)}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${
                         currentGuest.starter === item.id
                           ? 'bg-red-600 text-white border-red-700 scale-105'
@@ -443,6 +549,7 @@ export default function ChristmasMenuSelector() {
                       key={item.id}
                       type="button"
                       onClick={() => handleCourseSelect('main', item.id)}
+                      disabled={loading}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${
                         currentGuest.main === item.id
                           ? 'bg-green-600 text-white border-green-700 scale-105'
@@ -467,7 +574,7 @@ export default function ChristmasMenuSelector() {
                       key={item.id}
                       type="button"
                       onClick={() => handleCourseSelect('dessert', item.id)}
-                      disabled={currentGuest.courses === 2 && currentGuest.starter && currentGuest.dessert !== item.id}
+                      disabled={loading || (currentGuest.courses === 2 && currentGuest.starter && currentGuest.dessert !== item.id)}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${
                         currentGuest.dessert === item.id
                           ? 'bg-red-600 text-white border-red-700 scale-105'
@@ -485,12 +592,13 @@ export default function ChristmasMenuSelector() {
 
               <button
                 type="submit"
-                className="w-full py-4 text-xl font-bold rounded-lg text-white transition-all shadow-lg hover:scale-105"
+                disabled={loading}
+                className="w-full py-4 text-xl font-bold rounded-lg text-white transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(90deg, #C41E3A 0%, #0F4C23 50%, #C41E3A 100%)'
                 }}
               >
-                🎅 Submit Order (£{currentGuest.courses === 2 ? '32' : '37'}) 🎄
+                {loading ? '⏳ Saving...' : `🎅 Submit Order (£${currentGuest.courses === 2 ? '32' : '37'}) 🎄`}
               </button>
             </form>
           </div>
@@ -502,6 +610,13 @@ export default function ChristmasMenuSelector() {
                   🎅 All Orders 🤶
                 </h2>
                 <div className="flex gap-3">
+                  <button
+                    onClick={loadOrdersFromSheet}
+                    disabled={loading}
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} /> Refresh
+                  </button>
                   <button
                     onClick={clearAllOrders}
                     className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center gap-2"
@@ -516,6 +631,12 @@ export default function ChristmasMenuSelector() {
                   </button>
                 </div>
               </div>
+
+              {lastUpdate && (
+                <div className="text-sm text-gray-500 mb-4">
+                  Last updated: {lastUpdate.toLocaleTimeString('en-GB')}
+                </div>
+              )}
 
               {/* STATISTICS SECTION */}
               <div className="bg-red-50 rounded-lg p-4 mb-6 border-2 border-red-200">

@@ -107,7 +107,12 @@ export default function ChristmasMenuSelector() {
       dessert: '',
       orderDate: ''
     });
+    
+    // Show success message
     alert('Order submitted successfully! 🎄');
+    
+    // Automatically switch to "View All Orders" tab
+    setViewMode('view');
   };
 
   const clearAllOrders = () => {

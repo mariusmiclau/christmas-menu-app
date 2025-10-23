@@ -44,9 +44,15 @@ export default function ChristmasMenuSelector() {
       alert('Please select all 3 courses for the 3-course menu!');
       return;
     }
-    if (currentGuest.courses === 2 && !currentGuest.starter && !currentGuest.dessert) {
-      alert('Please select a starter or dessert for the 2-course menu!');
-      return;
+    if (currentGuest.courses === 2) {
+      if (!currentGuest.starter && !currentGuest.dessert) {
+        alert('Please select either a starter OR a dessert for the 2-course menu!');
+        return;
+      }
+      if (currentGuest.starter && currentGuest.dessert) {
+        alert('For 2-course menu, please select only ONE: either a starter OR a dessert (not both)!');
+        return;
+      }
     }
 
     const newGuest = { ...currentGuest, id: Date.now() };
@@ -62,18 +68,85 @@ export default function ChristmasMenuSelector() {
   };
 
   const exportData = () => {
-    const summary = guests.map(g => {
-      const starter = menuData.starters.find(s => s.id === g.starter)?.name || 'None';
-      const main = menuData.mains.find(m => m.id === g.main)?.name || 'None';
-      const dessert = menuData.desserts.find(d => d.id === g.dessert)?.name || 'None';
-      return `${g.name} (${g.courses} courses):\n- Starter: ${starter}\n- Main: ${main}\n- Dessert: ${dessert}\n`;
-    }).join('\n');
+    // Calculate statistics
+    const twoCourseCount = guests.filter(g => g.courses === 2).length;
+    const threeCourseCount = guests.filter(g => g.courses === 3).length;
+    const twoCourseTotal = twoCourseCount * 32;
+    const threeCourseTotal = threeCourseCount * 37;
     
-    const blob = new Blob([summary], { type: 'text/plain' });
+    // Get dish counts
+    const starterCounts = getCounts('starters');
+    const mainCounts = getCounts('mains');
+    const dessertCounts = getCounts('desserts');
+    
+    // Create comprehensive report
+    let report = '═══════════════════════════════════════════════════════\n';
+    report += '          F&V CHRISTMAS DINNER - FINAL ORDER          \n';
+    report += '═══════════════════════════════════════════════════════\n\n';
+    
+    report += '📅 EVENT DETAILS:\n';
+    report += '   Date Options: Tuesday 2nd December OR Wednesday 3rd December\n';
+    report += '   Welcome Drinks: Bubbles or Orange Juice\n\n';
+    
+    report += '═══════════════════════════════════════════════════════\n';
+    report += '📊 ORDER SUMMARY\n';
+    report += '═══════════════════════════════════════════════════════\n\n';
+    
+    report += `Total Guests: ${guests.length}\n`;
+    report += `   • 2-Course Menu (£32): ${twoCourseCount} guests = £${twoCourseTotal}\n`;
+    report += `   • 3-Course Menu (£37): ${threeCourseCount} guests = £${threeCourseTotal}\n\n`;
+    report += `TOTAL COST: £${totalCost}\n\n`;
+    
+    report += '═══════════════════════════════════════════════════════\n';
+    report += '🍽️ DISH QUANTITIES\n';
+    report += '═══════════════════════════════════════════════════════\n\n';
+    
+    report += '--- STARTERS ---\n';
+    starterCounts.forEach(item => {
+      if (item.count > 0) {
+        report += `   ${item.count}× ${item.name}\n`;
+      }
+    });
+    
+    report += '\n--- MAIN COURSES ---\n';
+    mainCounts.forEach(item => {
+      if (item.count > 0) {
+        report += `   ${item.count}× ${item.name}\n`;
+      }
+    });
+    
+    report += '\n--- DESSERTS ---\n';
+    dessertCounts.forEach(item => {
+      if (item.count > 0) {
+        report += `   ${item.count}× ${item.name}\n`;
+      }
+    });
+    
+    report += '\n═══════════════════════════════════════════════════════\n';
+    report += '👥 INDIVIDUAL GUEST ORDERS\n';
+    report += '═══════════════════════════════════════════════════════\n\n';
+    
+    guests.forEach((guest, index) => {
+      const starter = menuData.starters.find(s => s.id === guest.starter);
+      const main = menuData.mains.find(m => m.id === guest.main);
+      const dessert = menuData.desserts.find(d => d.id === guest.dessert);
+      
+      report += `${index + 1}. ${guest.name} (${guest.courses} courses - £${guest.courses === 2 ? 32 : 37})\n`;
+      if (guest.starter) report += `   Starter: ${starter?.name}\n`;
+      report += `   Main: ${main?.name}\n`;
+      if (guest.dessert) report += `   Dessert: ${dessert?.name}\n`;
+      report += '\n';
+    });
+    
+    report += '═══════════════════════════════════════════════════════\n';
+    report += 'Generated: ' + new Date().toLocaleString('en-GB') + '\n';
+    report += '═══════════════════════════════════════════════════════\n';
+    
+    const blob = new Blob([report], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'christmas-dinner-orders.txt';
+    a.download = `FV-Christmas-Dinner-Order-${guests.length}-guests.txt`;
     a.click();
   };
 
@@ -89,21 +162,31 @@ export default function ChristmasMenuSelector() {
   const totalCost = guests.reduce((sum, g) => sum + (g.courses === 2 ? 32 : 37), 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-green-50 p-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-red-900 to-green-800 p-4 relative overflow-hidden">
+      {/* Decorative floating elements */}
+      <div className="absolute top-10 left-10 text-6xl opacity-20 animate-bounce">🎅</div>
+      <div className="absolute top-20 right-10 text-6xl opacity-20 animate-bounce" style={{animationDelay: '0.5s'}}>🤶</div>
+      <div className="absolute bottom-10 left-20 text-6xl opacity-20 animate-bounce" style={{animationDelay: '1s'}}>⛄</div>
+      <div className="absolute bottom-20 right-20 text-6xl opacity-20 animate-bounce" style={{animationDelay: '1.5s'}}>🎄</div>
+      <div className="absolute top-1/3 left-1/4 text-4xl opacity-10">❄️</div>
+      <div className="absolute top-1/2 right-1/4 text-4xl opacity-10">❄️</div>
+      <div className="absolute bottom-1/3 left-1/3 text-4xl opacity-10">❄️</div>
+      
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8 pt-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Sparkles className="text-red-600" size={32} />
-            <h1 className="text-4xl font-bold text-gray-800">F&V Christmas Menu</h1>
-            <Sparkles className="text-green-600" size={32} />
+            <span className="text-4xl">🎅</span>
+            <Sparkles className="text-red-400" size={32} />
+            <h1 className="text-4xl font-bold text-white drop-shadow-lg">F&V Christmas Menu</h1>
+            <Sparkles className="text-green-400" size={32} />
+            <span className="text-4xl">🎅</span>
           </div>
-          <p className="text-gray-600 mb-2">2 Courses £32 | 3 Courses £37 per person</p>
-          <p className="text-sm text-gray-500">Suggested dates: Tuesday 2nd Dec / Wednesday 3rd Dec</p>
-          <div className="flex items-center justify-center gap-2 mt-4">
+          <p className="text-white text-lg mb-2 drop-shadow">2 Courses £32 | 3 Courses £37 per person</p>
+          <p className="text-sm text-green-200 drop-shadow">Suggested dates: Tuesday 2nd Dec / Wednesday 3rd Dec</p>
+          <div className="flex items-center justify-center gap-2 mt-4 bg-white/90 backdrop-blur rounded-lg py-3 px-6 inline-flex">
             <Users className="text-blue-600" />
             <span className="text-lg font-semibold">{guests.length} guests registered</span>
-            <span className="text-gray-600">| Total: £{totalCost}</span>
           </div>
         </div>
 
@@ -135,8 +218,12 @@ export default function ChristmasMenuSelector() {
 
         {/* Form View */}
         {viewMode === 'form' && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Select Your Menu</h2>
+          <div className="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-8 mb-8 border-4 border-red-600">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <span className="text-3xl">🎅</span>
+              <h2 className="text-2xl font-bold text-gray-800">Select Your Menu</h2>
+              <span className="text-3xl">🤶</span>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Name Input */}
               <div>
@@ -205,9 +292,14 @@ export default function ChristmasMenuSelector() {
                         name="starter"
                         value={starter.id}
                         checked={currentGuest.starter === starter.id}
-                        onChange={(e) =>
-                          setCurrentGuest({ ...currentGuest, starter: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const newGuest = { ...currentGuest, starter: e.target.value };
+                          // For 2-course menu, clear dessert when starter is selected
+                          if (currentGuest.courses === 2) {
+                            newGuest.dessert = '';
+                          }
+                          setCurrentGuest(newGuest);
+                        }}
                         className="mr-3"
                       />
                       <span className="font-medium">{starter.name}</span>
@@ -275,9 +367,14 @@ export default function ChristmasMenuSelector() {
                         name="dessert"
                         value={dessert.id}
                         checked={currentGuest.dessert === dessert.id}
-                        onChange={(e) =>
-                          setCurrentGuest({ ...currentGuest, dessert: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const newGuest = { ...currentGuest, dessert: e.target.value };
+                          // For 2-course menu, clear starter when dessert is selected
+                          if (currentGuest.courses === 2) {
+                            newGuest.starter = '';
+                          }
+                          setCurrentGuest(newGuest);
+                        }}
                         className="mr-3"
                       />
                       <span className="font-medium">{dessert.name}</span>
@@ -291,9 +388,9 @@ export default function ChristmasMenuSelector() {
 
               <button
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-red-600 to-green-600 text-white font-bold rounded-lg hover:from-red-700 hover:to-green-700 transition text-lg"
+                className="w-full py-4 bg-gradient-to-r from-red-600 via-green-600 to-red-600 text-white font-bold rounded-lg hover:from-red-700 hover:via-green-700 hover:to-red-700 transition text-lg shadow-lg"
               >
-                Submit Order (£{price})
+                🎅 Submit Order (£{price}) 🎄
               </button>
             </form>
           </div>
@@ -303,9 +400,13 @@ export default function ChristmasMenuSelector() {
         {viewMode === 'summary' && (
           <div className="space-y-6">
             {/* Guest List */}
-            <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-8 border-4 border-green-600">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">All Orders</h2>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🎅</span>
+                  <h2 className="text-2xl font-bold text-gray-800">All Orders</h2>
+                  <span className="text-3xl">🤶</span>
+                </div>
                 {guests.length > 0 && (
                   <button
                     onClick={exportData}
@@ -360,8 +461,11 @@ export default function ChristmasMenuSelector() {
             {guests.length > 0 && (
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Starter Stats */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-lg font-bold text-red-600 mb-4">Starter Counts</h3>
+                <div className="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-6 border-4 border-red-500">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">⛄</span>
+                    <h3 className="text-lg font-bold text-red-600">Starter Counts</h3>
+                  </div>
                   {getCounts('starters').map(item => (
                     <div key={item.id} className="mb-2">
                       <div className="flex justify-between text-sm">
@@ -373,8 +477,11 @@ export default function ChristmasMenuSelector() {
                 </div>
 
                 {/* Main Stats */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-lg font-bold text-green-600 mb-4">Main Dish Counts</h3>
+                <div className="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-6 border-4 border-green-500">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">🎄</span>
+                    <h3 className="text-lg font-bold text-green-600">Main Dish Counts</h3>
+                  </div>
                   {getCounts('mains').map(item => (
                     <div key={item.id} className="mb-2">
                       <div className="flex justify-between text-sm">
@@ -386,8 +493,11 @@ export default function ChristmasMenuSelector() {
                 </div>
 
                 {/* Dessert Stats */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-lg font-bold text-red-600 mb-4">Dessert Counts</h3>
+                <div className="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-6 border-4 border-red-500">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">🎁</span>
+                    <h3 className="text-lg font-bold text-red-600">Dessert Counts</h3>
+                  </div>
                   {getCounts('desserts').map(item => (
                     <div key={item.id} className="mb-2">
                       <div className="flex justify-between text-sm">

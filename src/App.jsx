@@ -49,17 +49,44 @@ export default function ChristmasMenuSelector() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!currentGuest.name || !currentGuest.main) {
-      alert('Please enter your name and select at least a main dish!');
+    
+    // Validation
+    if (!currentGuest.name) {
+      alert('Please enter your name!');
       return;
     }
-    if (currentGuest.courses === 3 && (!currentGuest.starter || !currentGuest.dessert)) {
-      alert('Please select all 3 courses for the 3-course menu!');
+    
+    if (!currentGuest.main) {
+      alert('Please select a main dish!');
       return;
     }
-    if (currentGuest.courses === 2 && !currentGuest.starter && !currentGuest.dessert) {
-      alert('Please select a starter or dessert for the 2-course menu!');
-      return;
+    
+    // 3-course validation
+    if (currentGuest.courses === 3) {
+      if (!currentGuest.starter || !currentGuest.dessert) {
+        alert('For 3-course menu, please select Starter, Main, and Dessert!');
+        return;
+      }
+    }
+    
+    // 2-course validation - MUST have exactly 2 items
+    if (currentGuest.courses === 2) {
+      const selectedCount = [
+        currentGuest.starter, 
+        currentGuest.main, 
+        currentGuest.dessert
+      ].filter(item => item !== '').length;
+      
+      if (selectedCount !== 2) {
+        alert('For 2-course menu, please select exactly 2 items:\n\n• Main + Starter OR\n• Main + Dessert\n\n(You currently have ' + selectedCount + ' items selected)');
+        return;
+      }
+      
+      // Must have main + one other
+      if (!currentGuest.starter && !currentGuest.dessert) {
+        alert('For 2-course menu, please select Main + Starter OR Main + Dessert!');
+        return;
+      }
     }
     
     const now = new Date();
@@ -81,6 +108,24 @@ export default function ChristmasMenuSelector() {
       orderDate: ''
     });
     alert('Order submitted successfully! 🎄');
+  };
+
+  const clearAllOrders = () => {
+    const confirmed = window.confirm(
+      '⚠️ WARNING: This will delete ALL orders!\n\nAre you sure you want to clear all guest orders? This action cannot be undone.'
+    );
+    
+    if (confirmed) {
+      const doubleCheck = window.confirm(
+        '🚨 FINAL CONFIRMATION\n\nThis will permanently delete all ' + guests.length + ' orders.\n\nClick OK to proceed or Cancel to keep the orders.'
+      );
+      
+      if (doubleCheck) {
+        setGuests([]);
+        localStorage.removeItem('christmasGuests');
+        alert('✅ All orders have been cleared!');
+      }
+    }
   };
 
   const getItemName = (id, category) => {
@@ -153,6 +198,58 @@ export default function ChristmasMenuSelector() {
 
   const stats = getStats();
 
+  // Helper to check if we can select this course type
+  const canSelectCourse = (courseType) => {
+    if (currentGuest.courses === 3) return true;
+    
+    // For 2-course: main is always required
+    if (courseType === 'main') return true;
+    
+    // For 2-course: can only select starter OR dessert (not both)
+    if (courseType === 'starter') {
+      return !currentGuest.dessert; // Can only select if dessert not selected
+    }
+    if (courseType === 'dessert') {
+      return !currentGuest.starter; // Can only select if starter not selected
+    }
+    
+    return false;
+  };
+
+  // Handle course selection with 2-course restriction
+  const handleCourseSelect = (courseType, itemId) => {
+    if (currentGuest.courses === 2) {
+      // For 2-course menu
+      if (courseType === 'starter') {
+        // If selecting starter, clear dessert
+        setCurrentGuest({
+          ...currentGuest,
+          starter: currentGuest.starter === itemId ? '' : itemId,
+          dessert: ''
+        });
+      } else if (courseType === 'dessert') {
+        // If selecting dessert, clear starter
+        setCurrentGuest({
+          ...currentGuest,
+          dessert: currentGuest.dessert === itemId ? '' : itemId,
+          starter: ''
+        });
+      } else {
+        // Main course
+        setCurrentGuest({
+          ...currentGuest,
+          [courseType]: currentGuest[courseType] === itemId ? '' : itemId
+        });
+      }
+    } else {
+      // For 3-course menu - normal toggle
+      setCurrentGuest({
+        ...currentGuest,
+        [courseType]: currentGuest[courseType] === itemId ? '' : itemId
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden" style={{
       background: 'linear-gradient(135deg, #165B33 0%, #8B0000 25%, #C41E3A 50%, #8B0000 75%, #0F4C23 100%)'
@@ -221,12 +318,12 @@ export default function ChristmasMenuSelector() {
         </div>
 
         {viewMode === 'form' ? (
-          <div className="max-w-2xl mx-auto bg-white/95 backdrop-blur rounded-xl shadow-2xl p-8 border-4 border-red-600">
+          <div className="max-w-6xl mx-auto bg-white/95 backdrop-blur rounded-xl shadow-2xl p-8 border-4 border-red-600">
             <h2 className="text-3xl font-bold text-center mb-6 text-red-700">
               🎅 Place Your Order 🎄
             </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
               <div>
                 <label className="block text-lg font-semibold mb-2 text-gray-700">
                   Your Name *
@@ -248,15 +345,23 @@ export default function ChristmasMenuSelector() {
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
-                    onClick={() => setCurrentGuest({...currentGuest, courses: 2})}
+                    onClick={() => {
+                      // Reset selections when changing menu type
+                      setCurrentGuest({
+                        ...currentGuest, 
+                        courses: 2,
+                        starter: '',
+                        dessert: ''
+                      });
+                    }}
                     className={`p-4 rounded-lg border-3 font-semibold transition-all ${
                       currentGuest.courses === 2
                         ? 'bg-red-600 text-white border-red-700 scale-105'
                         : 'bg-white border-gray-300 hover:border-red-400'
                     }`}
                   >
-                    2 Courses<br/>
-                    <span className="text-sm opacity-90">Main + Starter OR Dessert</span>
+                    2 Courses - £32<br/>
+                    <span className="text-sm opacity-90">Main + (Starter OR Dessert)</span>
                   </button>
                   <button
                     type="button"
@@ -267,72 +372,97 @@ export default function ChristmasMenuSelector() {
                         : 'bg-white border-gray-300 hover:border-green-400'
                     }`}
                   >
-                    3 Courses<br/>
+                    3 Courses - £37<br/>
                     <span className="text-sm opacity-90">Starter + Main + Dessert</span>
                   </button>
                 </div>
+                
+                {currentGuest.courses === 2 && (
+                  <div className="mt-2 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                    <p className="text-sm text-yellow-800 font-semibold">
+                      ⚠️ 2-Course Menu: Select Main + EITHER Starter OR Dessert (not both)
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {(currentGuest.courses === 3 || currentGuest.courses === 2) && (
-                <div>
-                  <label className="block text-lg font-semibold mb-2 text-gray-700">
-                    Starter {currentGuest.courses === 3 ? '*' : '(Optional)'}
-                  </label>
-                  <select
-                    value={currentGuest.starter}
-                    onChange={(e) => setCurrentGuest({...currentGuest, starter: e.target.value})}
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-red-500 focus:outline-none text-base"
-                    required={currentGuest.courses === 3}
-                  >
-                    <option value="">-- Select Starter --</option>
-                    {menuData.starters.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.tags.join(', ')})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
+              {/* STARTERS GRID */}
               <div>
-                <label className="block text-lg font-semibold mb-2 text-gray-700">
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
+                  Starters {currentGuest.courses === 3 ? '*' : '(Optional - choose this OR dessert)'}
+                </label>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {menuData.starters.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleCourseSelect('starter', item.id)}
+                      disabled={currentGuest.courses === 2 && currentGuest.dessert && currentGuest.starter !== item.id}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        currentGuest.starter === item.id
+                          ? 'bg-red-600 text-white border-red-700 scale-105'
+                          : currentGuest.courses === 2 && currentGuest.dessert
+                          ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-50'
+                          : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-sm mb-1">{item.name}</div>
+                      <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* MAINS GRID */}
+              <div>
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
                   Main Course *
                 </label>
-                <select
-                  value={currentGuest.main}
-                  onChange={(e) => setCurrentGuest({...currentGuest, main: e.target.value})}
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-red-500 focus:outline-none text-base"
-                  required
-                >
-                  <option value="">-- Select Main --</option>
+                <div className="grid md:grid-cols-2 gap-3">
                   {menuData.mains.map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} ({item.tags.join(', ')})
-                    </option>
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleCourseSelect('main', item.id)}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        currentGuest.main === item.id
+                          ? 'bg-green-600 text-white border-green-700 scale-105'
+                          : 'bg-white border-gray-300 hover:border-green-400 hover:bg-green-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-sm mb-1">{item.name}</div>
+                      <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
-              {(currentGuest.courses === 3 || currentGuest.courses === 2) && (
-                <div>
-                  <label className="block text-lg font-semibold mb-2 text-gray-700">
-                    Dessert {currentGuest.courses === 3 ? '*' : '(Optional)'}
-                  </label>
-                  <select
-                    value={currentGuest.dessert}
-                    onChange={(e) => setCurrentGuest({...currentGuest, dessert: e.target.value})}
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-red-500 focus:outline-none text-base"
-                    required={currentGuest.courses === 3}
-                  >
-                    <option value="">-- Select Dessert --</option>
-                    {menuData.desserts.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.tags.join(', ')})
-                      </option>
-                    ))}
-                  </select>
+              {/* DESSERTS GRID */}
+              <div>
+                <label className="block text-lg font-semibold mb-3 text-gray-700">
+                  Desserts {currentGuest.courses === 3 ? '*' : '(Optional - choose this OR starter)'}
+                </label>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {menuData.desserts.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleCourseSelect('dessert', item.id)}
+                      disabled={currentGuest.courses === 2 && currentGuest.starter && currentGuest.dessert !== item.id}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        currentGuest.dessert === item.id
+                          ? 'bg-red-600 text-white border-red-700 scale-105'
+                          : currentGuest.courses === 2 && currentGuest.starter
+                          ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-50'
+                          : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-sm mb-1">{item.name}</div>
+                      <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
 
               <button
                 type="submit"
@@ -341,7 +471,7 @@ export default function ChristmasMenuSelector() {
                   background: 'linear-gradient(90deg, #C41E3A 0%, #0F4C23 50%, #C41E3A 100%)'
                 }}
               >
-                🎅 Submit Order 🎄
+                🎅 Submit Order (£{currentGuest.courses === 2 ? '32' : '37'}) 🎄
               </button>
             </form>
           </div>
@@ -352,15 +482,23 @@ export default function ChristmasMenuSelector() {
                 <h2 className="text-3xl font-bold text-green-700 flex items-center gap-3">
                   🎅 All Orders 🤶
                 </h2>
-                <button
-                  onClick={exportOrders}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2"
-                >
-                  <Download size={20} /> Export Orders
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={clearAllOrders}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center gap-2"
+                  >
+                    🗑️ Clear All Orders
+                  </button>
+                  <button
+                    onClick={exportOrders}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2"
+                  >
+                    <Download size={20} /> Export Orders
+                  </button>
+                </div>
               </div>
 
-              {/* STATISTICS SECTION - NOW AT TOP */}
+              {/* STATISTICS SECTION */}
               <div className="bg-red-50 rounded-lg p-4 mb-6 border-2 border-red-200">
                 <h3 className="text-xl font-bold text-red-700 mb-3">📊 Order Statistics</h3>
                 

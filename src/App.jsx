@@ -234,7 +234,7 @@ export default function ChristmasMenuSelector() {
     }
     
     // Check password (change "admin123" to your preferred password)
-    if (password !== 'admin123') {
+    if (password !== 'PaulW123') {
       alert('❌ Incorrect password. Access denied.');
       return;
     }

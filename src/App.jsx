@@ -248,7 +248,13 @@ export default function ChristmasMenuSelector() {
                 <div className="flex gap-4">
                   <button
                     type="button"
-                    onClick={() => setCurrentGuest({ ...currentGuest, courses: 2 })}
+                    onClick={() => setCurrentGuest({ 
+                      ...currentGuest, 
+                      courses: 2,
+                      starter: '',
+                      main: '',
+                      dessert: ''
+                    })}
                     className={`flex-1 py-4 rounded-lg font-semibold transition ${
                       currentGuest.courses === 2
                         ? 'bg-red-600 text-white'
@@ -259,7 +265,13 @@ export default function ChristmasMenuSelector() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCurrentGuest({ ...currentGuest, courses: 3 })}
+                    onClick={() => setCurrentGuest({ 
+                      ...currentGuest, 
+                      courses: 3,
+                      starter: '',
+                      main: '',
+                      dessert: ''
+                    })}
                     className={`flex-1 py-4 rounded-lg font-semibold transition ${
                       currentGuest.courses === 3
                         ? 'bg-red-600 text-white'
@@ -281,10 +293,10 @@ export default function ChristmasMenuSelector() {
                   {menuData.starters.map((starter) => (
                     <label
                       key={starter.id}
-                      className={`block p-4 border-2 rounded-lg cursor-pointer transition ${
+                      className={`block p-4 border-3 rounded-lg cursor-pointer transition shadow-sm ${
                         currentGuest.starter === starter.id
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-red-600 bg-red-50 shadow-md ring-2 ring-red-500'
+                          : 'border-gray-400 bg-white hover:border-red-400 hover:bg-red-50'
                       }`}
                     >
                       <input
@@ -320,10 +332,10 @@ export default function ChristmasMenuSelector() {
                   {menuData.mains.map((main) => (
                     <label
                       key={main.id}
-                      className={`block p-4 border-2 rounded-lg cursor-pointer transition ${
+                      className={`block p-4 border-3 rounded-lg cursor-pointer transition shadow-sm ${
                         currentGuest.main === main.id
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-green-600 bg-green-50 shadow-md ring-2 ring-green-500'
+                          : 'border-gray-400 bg-white hover:border-green-400 hover:bg-green-50'
                       }`}
                     >
                       <input
@@ -356,10 +368,10 @@ export default function ChristmasMenuSelector() {
                   {menuData.desserts.map((dessert) => (
                     <label
                       key={dessert.id}
-                      className={`block p-4 border-2 rounded-lg cursor-pointer transition ${
+                      className={`block p-4 border-3 rounded-lg cursor-pointer transition shadow-sm ${
                         currentGuest.dessert === dessert.id
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-red-600 bg-red-50 shadow-md ring-2 ring-red-500'
+                          : 'border-gray-400 bg-white hover:border-red-400 hover:bg-red-50'
                       }`}
                     >
                       <input

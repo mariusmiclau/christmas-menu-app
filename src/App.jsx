@@ -111,6 +111,20 @@ export default function ChristmasMenuSelector() {
   };
 
   const clearAllOrders = () => {
+    // Admin password protection
+    const password = window.prompt('🔐 Admin Access Required\n\nPlease enter the admin password to clear all orders:');
+    
+    if (password === null) {
+      return; // User clicked cancel
+    }
+    
+    // Check password (change "admin123" to your preferred password)
+    if (password !== 'admin123') {
+      alert('❌ Incorrect password. Access denied.');
+      return;
+    }
+    
+    // Password correct, proceed with confirmation
     const confirmed = window.confirm(
       '⚠️ WARNING: This will delete ALL orders!\n\nAre you sure you want to clear all guest orders? This action cannot be undone.'
     );
@@ -256,10 +270,10 @@ export default function ChristmasMenuSelector() {
     }}>
       {/* Floating Christmas decorations */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-10 left-10 text-6xl animate-bounce">🧝‍♂️</div>
-        <div className="absolute top-20 right-20 text-6xl animate-bounce" style={{animationDelay: '0.5s'}}>🧝‍♀️</div>
+        <div className="absolute top-10 left-10 text-6xl animate-bounce">⛄</div>
+        <div className="absolute top-20 right-20 text-6xl animate-bounce" style={{animationDelay: '0.5s'}}>☃️</div>
         <div className="absolute bottom-20 left-20 text-7xl animate-bounce" style={{animationDelay: '1s'}}>🎅</div>
-        <div className="absolute bottom-32 right-32 text-6xl animate-bounce" style={{animationDelay: '1.5s'}}>🤶</div>
+        <div className="absolute bottom-32 right-32 text-6xl animate-bounce" style={{animationDelay: '1.5s'}}>⛄</div>
         
         {[...Array(15)].map((_, i) => (
           <div

@@ -9,6 +9,7 @@ export default function ChristmasMenuSelector() {
     starter: '',
     main: '',
     dessert: '',
+    steakPreference: '', // For Angus Sirloin steak cooking preference
     orderDate: ''
   });
   const [viewMode, setViewMode] = useState('form');
@@ -83,7 +84,8 @@ export default function ChristmasMenuSelector() {
           starter: row[2] || '',
           main: row[3] || '',
           dessert: row[4] || '',
-          orderDate: row[5] || ''
+          steakPreference: row[5] || '',
+          orderDate: row[6] || ''
         }));
         
         setGuests(loadedGuests);
@@ -115,11 +117,12 @@ export default function ChristmasMenuSelector() {
         newGuest.starter,
         newGuest.main,
         newGuest.dessert,
+        newGuest.steakPreference,
         newGuest.orderDate
       ];
 
       // Use Apps Script Web App to append data (we'll create this)
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec'; // You'll add this during setup
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';  // You'll add this during setup
       
       const response = await fetch(SCRIPT_URL, {
         method: 'POST',
@@ -135,7 +138,7 @@ export default function ChristmasMenuSelector() {
       });
 
       // Since no-cors mode, we can't check response, so we'll reload to verify
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Wait a bit for write
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second for write
       await loadOrdersFromSheet();
       
       return true;
@@ -159,6 +162,12 @@ export default function ChristmasMenuSelector() {
     
     if (!currentGuest.main) {
       alert('Please select a main dish!');
+      return;
+    }
+    
+    // Steak preference validation
+    if (currentGuest.main === 'm1' && !currentGuest.steakPreference) {
+      alert('Please select how you would like your steak cooked!');
       return;
     }
     
@@ -214,6 +223,7 @@ export default function ChristmasMenuSelector() {
         starter: '',
         main: '',
         dessert: '',
+        steakPreference: '',
         orderDate: ''
       });
       
@@ -234,7 +244,7 @@ export default function ChristmasMenuSelector() {
     }
     
     // Check password (change "admin123" to your preferred password)
-    if (password !== 'PaulW123') {
+    if (password !== 'admin123') {
       alert('❌ Incorrect password. Access denied.');
       return;
     }
@@ -286,7 +296,12 @@ export default function ChristmasMenuSelector() {
         if (starter) report += `   Starter: ${starter.name} (${starter.tags.join(', ')})\n`;
       }
       if (guest.main) {
-        report += `   Main: ${getItemName(guest.main, 'mains')}\n`;
+        const mainName = getItemName(guest.main, 'mains');
+        report += `   Main: ${mainName}`;
+        if (guest.main === 'm1' && guest.steakPreference) {
+          report += ` (Cooked: ${guest.steakPreference})`;
+        }
+        report += '\n';
       }
       if (guest.dessert) {
         const dessert = menuData.desserts.find(d => d.id === guest.dessert);
@@ -347,19 +362,30 @@ export default function ChristmasMenuSelector() {
           dessert: currentGuest.dessert === itemId ? '' : itemId,
           starter: ''
         });
+      } else if (courseType === 'main') {
+        // Main course - clear steak preference if changing away from steak
+        const newMain = currentGuest.main === itemId ? '' : itemId;
+        setCurrentGuest({
+          ...currentGuest,
+          main: newMain,
+          steakPreference: newMain === 'm1' ? currentGuest.steakPreference : ''
+        });
+      }
+    } else {
+      // For 3-course menu - normal toggle
+      if (courseType === 'main') {
+        const newMain = currentGuest.main === itemId ? '' : itemId;
+        setCurrentGuest({
+          ...currentGuest,
+          main: newMain,
+          steakPreference: newMain === 'm1' ? currentGuest.steakPreference : ''
+        });
       } else {
-        // Main course
         setCurrentGuest({
           ...currentGuest,
           [courseType]: currentGuest[courseType] === itemId ? '' : itemId
         });
       }
-    } else {
-      // For 3-course menu - normal toggle
-      setCurrentGuest({
-        ...currentGuest,
-        [courseType]: currentGuest[courseType] === itemId ? '' : itemId
-      });
     }
   };
 
@@ -543,22 +569,49 @@ export default function ChristmasMenuSelector() {
                 <label className="block text-lg font-semibold mb-3 text-gray-700">
                   Main Course *
                 </label>
-                <div className="grid md:grid-cols-2 gap-3">
+                <div className="space-y-3">
                   {menuData.mains.map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleCourseSelect('main', item.id)}
-                      disabled={loading}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        currentGuest.main === item.id
-                          ? 'bg-green-600 text-white border-green-700 scale-105'
-                          : 'bg-white border-gray-300 hover:border-green-400 hover:bg-green-50'
-                      }`}
-                    >
-                      <div className="font-semibold text-sm mb-1">{item.name}</div>
-                      <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
-                    </button>
+                    <div key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleCourseSelect('main', item.id)}
+                        disabled={loading}
+                        className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                          currentGuest.main === item.id
+                            ? 'bg-green-600 text-white border-green-700 scale-105'
+                            : 'bg-white border-gray-300 hover:border-green-400 hover:bg-green-50'
+                        }`}
+                      >
+                        <div className="font-semibold text-sm mb-1">{item.name}</div>
+                        <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
+                      </button>
+                      
+                      {/* STEAK PREFERENCE (shows directly under steak when selected) */}
+                      {item.id === 'm1' && currentGuest.main === 'm1' && (
+                        <div className="mt-3 ml-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                          <label className="block text-base font-semibold mb-3 text-gray-700">
+                            🥩 How would you like your steak cooked? *
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done'].map(preference => (
+                              <button
+                                key={preference}
+                                type="button"
+                                onClick={() => setCurrentGuest({...currentGuest, steakPreference: preference})}
+                                disabled={loading}
+                                className={`p-2 rounded-lg border-2 font-semibold text-sm transition-all ${
+                                  currentGuest.steakPreference === preference
+                                    ? 'bg-green-600 text-white border-green-700 scale-105'
+                                    : 'bg-white border-gray-300 hover:border-green-400 hover:bg-green-50'
+                                }`}
+                              >
+                                {preference}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -710,6 +763,11 @@ export default function ChristmasMenuSelector() {
                         <p>
                           <span className="font-semibold text-green-600">Main:</span>{' '}
                           {getItemName(guest.main, 'mains')}
+                          {guest.main === 'm1' && guest.steakPreference && (
+                            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                              🥩 {guest.steakPreference}
+                            </span>
+                          )}
                         </p>
                         {guest.dessert && (
                           <p>

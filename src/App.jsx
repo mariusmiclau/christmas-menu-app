@@ -17,8 +17,8 @@ export default function ChristmasMenuSelector() {
   const [lastUpdate, setLastUpdate] = useState(null);
 
   // CONFIGURATION - REPLACE THESE VALUES
-  const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw'; // Replace with your Google Sheet ID
-  const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw'; // Replace with your API key
+  const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw';
+  const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw';
   const SHEET_NAME = 'Orders'; // The name of the sheet tab
 
   const menuData = {
@@ -121,8 +121,8 @@ export default function ChristmasMenuSelector() {
         newGuest.orderDate
       ];
 
-      // Use Apps Script Web App to append data (we'll create this)
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';  // You'll add this during setup
+      // Use Apps Script Web App to append data
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';
       
       const response = await fetch(SCRIPT_URL, {
         method: 'POST',
@@ -277,7 +277,7 @@ export default function ChristmasMenuSelector() {
     report += '         F&V CHRISTMAS DINNER - FINAL ORDERS\n';
     report += '═══════════════════════════════════════════════════════\n\n';
     report += `Total Guests: ${guests.length}\n`;
-    report += `Date: Tuesday 2nd December or Wednesday 3rd December\n\n`;
+    report += `Event Date: Tuesday 3rd December 2025\n\n`;
     
     let total2Course = guests.filter(g => g.courses === 2).length;
     let total3Course = guests.filter(g => g.courses === 3).length;
@@ -286,6 +286,71 @@ export default function ChristmasMenuSelector() {
     report += `2-Course Menu (£32): ${total2Course} guests\n`;
     report += `3-Course Menu (£37): ${total3Course} guests\n`;
     report += `TOTAL COST: £${totalCost}\n\n`;
+    report += '═══════════════════════════════════════════════════════\n';
+    report += '                   ORDER STATISTICS\n';
+    report += '                 (For Kitchen Preparation)\n';
+    report += '═══════════════════════════════════════════════════════\n\n';
+    
+    // Calculate statistics
+    const stats = getStats();
+    
+    // STARTERS
+    report += 'STARTERS:\n';
+    report += '─────────────────────────────────────────────────────\n';
+    let hasStarters = false;
+    menuData.starters.forEach(item => {
+      if (stats.starters[item.id] > 0) {
+        report += `  ${stats.starters[item.id]}x ${item.name}\n`;
+        hasStarters = true;
+      }
+    });
+    if (!hasStarters) report += '  None ordered\n';
+    report += '\n';
+    
+    // MAINS
+    report += 'MAIN COURSES:\n';
+    report += '─────────────────────────────────────────────────────\n';
+    menuData.mains.forEach(item => {
+      if (stats.mains[item.id] > 0) {
+        report += `  ${stats.mains[item.id]}x ${item.name}\n`;
+        
+        // If it's steak, show cooking preferences breakdown
+        if (item.id === 'm1') {
+          const steakPreferences = {};
+          guests.forEach(guest => {
+            if (guest.main === 'm1' && guest.steakPreference) {
+              steakPreferences[guest.steakPreference] = (steakPreferences[guest.steakPreference] || 0) + 1;
+            }
+          });
+          
+          if (Object.keys(steakPreferences).length > 0) {
+            report += '     Cooking preferences:\n';
+            ['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done'].forEach(pref => {
+              if (steakPreferences[pref]) {
+                report += `       - ${steakPreferences[pref]}x ${pref}\n`;
+              }
+            });
+          }
+        }
+      }
+    });
+    report += '\n';
+    
+    // DESSERTS
+    report += 'DESSERTS:\n';
+    report += '─────────────────────────────────────────────────────\n';
+    let hasDesserts = false;
+    menuData.desserts.forEach(item => {
+      if (stats.desserts[item.id] > 0) {
+        report += `  ${stats.desserts[item.id]}x ${item.name}\n`;
+        hasDesserts = true;
+      }
+    });
+    if (!hasDesserts) report += '  None ordered\n';
+    report += '\n';
+    
+    report += '═══════════════════════════════════════════════════════\n';
+    report += '                 INDIVIDUAL GUEST ORDERS\n';
     report += '═══════════════════════════════════════════════════════\n\n';
 
     guests.forEach((guest, index) => {
@@ -429,7 +494,7 @@ export default function ChristmasMenuSelector() {
             🎄 F&V Christmas Dinner 🎄
           </h1>
           <p className="text-xl text-red-100 drop-shadow">
-            Tuesday 2nd December or Wednesday 3rd December
+            Tuesday 3rd December 2025
           </p>
         </div>
 
@@ -671,16 +736,16 @@ export default function ChristmasMenuSelector() {
                     <RefreshCw size={20} className={loading ? 'animate-spin' : ''} /> Refresh
                   </button>
                   <button
-                    onClick={clearAllOrders}
-                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center gap-2"
-                  >
-                    🗑️ Clear All Orders
-                  </button>
-                  <button
                     onClick={exportOrders}
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2"
                   >
                     <Download size={20} /> Export Orders
+                  </button>
+                  <button
+                    onClick={clearAllOrders}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center gap-2"
+                  >
+                    🗑️ Clear All Orders
                   </button>
                 </div>
               </div>

@@ -319,14 +319,27 @@ export default function ChristmasMenuSelector() {
           const steakPreferences = {};
           guests.forEach(guest => {
             if (guest.main === 'm1' && guest.steakPreference) {
-              steakPreferences[guest.steakPreference] = (steakPreferences[guest.steakPreference] || 0) + 1;
+              // Normalize to proper case for consistent display
+              const normalized = guest.steakPreference.trim();
+              steakPreferences[normalized] = (steakPreferences[normalized] || 0) + 1;
             }
           });
           
           if (Object.keys(steakPreferences).length > 0) {
             report += '     Cooking preferences:\n';
-            ['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done'].forEach(pref => {
+            // Show all preferences found (in order of preference)
+            const preferenceOrder = ['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done', 'Well done'];
+            
+            // First show standard preferences
+            preferenceOrder.forEach(pref => {
               if (steakPreferences[pref]) {
+                report += `       - ${steakPreferences[pref]}x ${pref}\n`;
+              }
+            });
+            
+            // Then show any other preferences not in standard list
+            Object.keys(steakPreferences).forEach(pref => {
+              if (!preferenceOrder.includes(pref)) {
                 report += `       - ${steakPreferences[pref]}x ${pref}\n`;
               }
             });
@@ -740,12 +753,6 @@ export default function ChristmasMenuSelector() {
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2"
                   >
                     <Download size={20} /> Export Orders
-                  </button>
-                  <button
-                    onClick={clearAllOrders}
-                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center gap-2"
-                  >
-                    🗑️ Clear All Orders
                   </button>
                 </div>
               </div>

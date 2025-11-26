@@ -17,8 +17,8 @@ export default function ChristmasMenuSelector() {
   const [lastUpdate, setLastUpdate] = useState(null);
 
   // CONFIGURATION - REPLACE THESE VALUES
-  const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE'; // Replace with your Google Sheet ID
-  const API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your API key
+  const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw'; // Replace with your Google Sheet ID
+  const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw'; // Replace with your API key
   const SHEET_NAME = 'Orders'; // The name of the sheet tab
 
   const menuData = {
@@ -122,7 +122,7 @@ export default function ChristmasMenuSelector() {
       ];
 
       // Use Apps Script Web App to append data (we'll create this)
-      const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE'; // You'll add this during setup
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';  // You'll add this during setup
       
       const response = await fetch(SCRIPT_URL, {
         method: 'POST',

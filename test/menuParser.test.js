@@ -105,6 +105,24 @@ test('merges a title recovered by the sparse-text fallback into its visual posit
   ]);
 });
 
+test('splits dessert dishes when OCR collapses the column into one visual line', () => {
+  const desserts = groupOcrColumnLines([
+    line('DESSERTS', 75, 46),
+    line(
+      'Dark Cherry & Chocolate Brownie — Madagascan vanilla ice cream & warm chocolate sauce   Apple, Blackberry & Cinnamon Crumble — Served with custard   Warm Christmas Pudding — Brandy sauce   Layered Salted Caramel Cheesecake — Whipped cream & honeycomb',
+      196,
+      42,
+    ),
+  ], 'desserts');
+
+  assert.deepEqual(desserts, [
+    'Dark Cherry & Chocolate Brownie — Madagascan vanilla ice cream & warm chocolate sauce',
+    'Apple, Blackberry & Cinnamon Crumble — Served with custard',
+    'Warm Christmas Pudding — Brandy sauce',
+    'Layered Salted Caramel Cheesecake — Whipped cream & honeycomb',
+  ]);
+});
+
 test('parses this poster into 4 starters, 5 mains and 4 desserts with prices', () => {
   const text = `
 2COURSES £40 | 3 COURSES £45

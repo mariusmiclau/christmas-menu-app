@@ -16,6 +16,14 @@ const HEADING_WORDS = {
 const SKIP_LINE = /^(menu|christmas menu|festive menu|allergens?|dietary information|please ask|prices? include|available from|terms|v\s*=|vg\s*=|gf\s*=|celebrating our|in traditional|pre-?order payment)/i;
 const TAG_PATTERN = 'vgo|gfo|voa|vegan|vegetarian|vg|gf|v';
 
+function splitVisualSegments(value) {
+  return String(value || '')
+    .replace(/\r/g, '')
+    .split(/\n+|\t+| {3,}/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
 export function cleanLine(line) {
   return String(line || '')
     .replace(/^[\s•·▪■◆◇*—–-]+/, '')
@@ -91,6 +99,7 @@ export function parseMenuText(text) {
   const lines = String(text || '')
     .replace(/\r/g, '')
     .split('\n')
+    .flatMap(splitVisualSegments)
     .map(cleanLine)
     .filter(Boolean);
 
@@ -221,6 +230,7 @@ export function groupOcrColumnLines(inputLines = [], category) {
   const headingPattern = CATEGORY_HEADINGS[category];
   const ordered = inputLines
     .filter((entry) => entry?.bbox && (entry.confidence ?? 100) >= 40)
+    .flatMap((entry) => splitVisualSegments(entry.text).map((text) => ({ ...entry, text })))
     .map((entry) => ({ ...entry, text: normaliseOcrText(entry.text) }))
     .filter((entry) => entry.text.length >= 3 && /[a-z0-9]/i.test(entry.text))
     .sort((a, b) => a.bbox.y0 - b.bbox.y0);

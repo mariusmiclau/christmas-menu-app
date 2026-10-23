@@ -173,14 +173,124 @@
   transform-origin: 50% 50%;
 }
 
+.photo-depth {
+  position: absolute;
+  inset: -1.5%;
+  z-index: 0;
+  will-change: transform;
+}
+
+.photo-breathe {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform-origin: 50% 52%;
+  will-change: transform;
+}
+
 .business-christmas-image {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
-  transform: scale(1.025);
+}
+
+.guest-motion {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transform-origin: 50% 56%;
   will-change: transform;
+}
+
+.guest-motion img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.guest-left {
+  -webkit-mask-image: radial-gradient(ellipse 22% 44% at 20% 39%, #000 48%, rgba(0, 0, 0, 0.82) 62%, transparent 78%);
+  mask-image: radial-gradient(ellipse 22% 44% at 20% 39%, #000 48%, rgba(0, 0, 0, 0.82) 62%, transparent 78%);
+  transform-origin: 23% 61%;
+}
+
+.guest-centre {
+  -webkit-mask-image: radial-gradient(ellipse 14% 36% at 49% 39%, #000 48%, rgba(0, 0, 0, 0.78) 63%, transparent 80%);
+  mask-image: radial-gradient(ellipse 14% 36% at 49% 39%, #000 48%, rgba(0, 0, 0, 0.78) 63%, transparent 80%);
+  transform-origin: 49% 60%;
+}
+
+.guest-right {
+  -webkit-mask-image: radial-gradient(ellipse 20% 44% at 73% 40%, #000 48%, rgba(0, 0, 0, 0.82) 62%, transparent 78%);
+  mask-image: radial-gradient(ellipse 20% 44% at 73% 40%, #000 48%, rgba(0, 0, 0, 0.82) 62%, transparent 78%);
+  transform-origin: 73% 62%;
+}
+
+.table-flames {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.living-flame {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: clamp(2px, 0.38vw, 5px);
+  height: clamp(5px, 0.9vw, 12px);
+  border-radius: 60% 45% 55% 50%;
+  background: linear-gradient(180deg, #fff8d5 8%, #ffd26f 48%, rgba(226, 104, 22, 0.2));
+  box-shadow:
+    0 0 0.25rem rgba(255, 229, 159, 0.92),
+    0 0 0.85rem rgba(255, 156, 51, 0.72);
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+  animation: flame-dance 1.15s var(--delay) ease-in-out infinite alternate;
+}
+
+.toast-glint {
+  position: absolute;
+  left: 18%;
+  top: 31%;
+  z-index: 3;
+  width: clamp(0.75rem, 1.7vw, 1.35rem);
+  aspect-ratio: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.toast-glint::before,
+.toast-glint::after,
+.toast-glint span {
+  content: "";
+  position: absolute;
+  inset: 46% 0 auto;
+  height: 1px;
+  background: #ffe7a6;
+  box-shadow: 0 0 0.55rem rgba(255, 221, 135, 0.92);
+}
+
+.toast-glint::after {
+  transform: rotate(90deg);
+}
+
+.toast-glint span {
+  transform: rotate(45deg);
+}
+
+.toast-glint span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  transform: rotate(90deg);
 }
 
 .business-image-shade,
@@ -255,6 +365,12 @@
   100% { transform: translate3d(1rem, 220px, 0); opacity: 0; }
 }
 
+@keyframes flame-dance {
+  0% { opacity: 0.72; transform: translate(-50%, -100%) scale(0.78, 0.9) rotate(-7deg); }
+  45% { opacity: 1; transform: translate(-50%, -100%) scale(1.08, 1.16) rotate(4deg); }
+  100% { opacity: 0.84; transform: translate(-50%, -100%) scale(0.9, 1.04) rotate(-2deg); }
+}
+
 @media (max-width: 1023px) {
   .hero-stage {
     grid-template-columns: 1fr;
@@ -317,6 +433,20 @@
 
   .business-christmas-image {
     object-position: 44% center;
+  }
+
+  .guest-motion img {
+    object-position: 44% center;
+  }
+
+  .guest-left {
+    -webkit-mask-image: radial-gradient(ellipse 24% 44% at 20% 39%, #000 46%, rgba(0, 0, 0, 0.8) 62%, transparent 79%);
+    mask-image: radial-gradient(ellipse 24% 44% at 20% 39%, #000 46%, rgba(0, 0, 0, 0.8) 62%, transparent 79%);
+  }
+
+  .guest-right {
+    -webkit-mask-image: radial-gradient(ellipse 23% 44% at 79% 40%, #000 46%, rgba(0, 0, 0, 0.8) 62%, transparent 79%);
+    mask-image: radial-gradient(ellipse 23% 44% at 79% 40%, #000 46%, rgba(0, 0, 0, 0.8) 62%, transparent 79%);
   }
 }
 

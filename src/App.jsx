@@ -1,861 +1,619 @@
-import React, { useState, useEffect } from 'react';
-import { Users, ChefHat, Download, Calendar, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Calendar,
+  ChefHat,
+  Download,
+  ExternalLink,
+  LogIn,
+  LogOut,
+  Library,
+  LockKeyhole,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
+import { getAdminSession, loginAsAdmin, logoutAdmin } from './adminAuth';
+import MenuManager from './MenuManager';
+import {
+  DEFAULT_MENU,
+  formatEventDate,
+  getSharedMenu,
+  itemNeedsPreference,
+  readStoredMenus,
+  storeMenus,
+} from './menuData';
 
-export default function ChristmasMenuSelector() {
-  const [guests, setGuests] = useState([]);
-  const [currentGuest, setCurrentGuest] = useState({
+const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw';
+const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw';
+const SHEET_NAME = 'Orders';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';
+const SHARED_MENU = getSharedMenu();
+
+function emptyOrder() {
+  return {
     name: '',
     courses: 2,
     starter: '',
     main: '',
     dessert: '',
-    steakPreference: '', // For Angus Sirloin steak cooking preference
-    orderDate: ''
-  });
-  const [viewMode, setViewMode] = useState('form');
-  const [loading, setLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-
-  // CONFIGURATION - REPLACE THESE VALUES
-  const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw';
-  const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw';
-  const SHEET_NAME = 'Orders'; // The name of the sheet tab
-
-  const menuData = {
-    starters: [
-      { id: 's1', name: 'Creamy garlic mushrooms + sourdough toast', tags: ['v'] },
-      { id: 's2', name: 'Lightly spiced parsnip soup + toasted cumin + honey', tags: ['v', 'vgo', 'gfo'] },
-      { id: 's3', name: 'Salmon Gravadlax + rye bread + horseradish + mustard cream', tags: ['gfo'] }
-    ],
-    mains: [
-      { id: 'm1', name: 'Angus Sirloin steak + mushrooms + roasted tomato + chips + green peppercorn sauce', tags: ['gfo'] },
-      { id: 'm2', name: 'Roasted salmon + crushed new potatoes + asparagus + dill beurre blanc sauce', tags: ['gfo'] },
-      { id: 'm3', name: 'Chicken breast + french beans + herby potatoes + tomato + mascarpone sauce', tags: ['gfo'] },
-      { id: 'm4', name: 'BBQ rib + wing combo box + coleslaw + corn + seasoned fries', tags: ['gfo'] },
-      { id: 'm5', name: 'Wild mushroom + roasted onion vegan puff pastry tart', tags: ['v', 'vgo'] }
-    ],
-    desserts: [
-      { id: 'd1', name: 'Biscoff cheesecake + toffee sauce + vanilla cream', tags: ['v'] },
-      { id: 'd2', name: 'Spiced cherry crumble + vanilla pod custard', tags: ['v'] },
-      { id: 'd3', name: 'Dark chocolate + caramel tart + berry compote', tags: ['v', 'vgo', 'gf'] },
-      { id: 'd4', name: 'British cheese + biscuit selection', tags: ['v'] }
-    ]
+    steakPreference: '',
+    orderDate: '',
   };
+}
 
-  // Load orders from Google Sheets on mount and when view changes
-  useEffect(() => {
-    loadOrdersFromSheet();
-  }, []);
+function priceLabel(value) {
+  const number = Number(value || 0);
+  return `£${Number.isInteger(number) ? number : number.toFixed(2)}`;
+}
 
-  // Auto-refresh every 30 seconds when viewing orders
-  useEffect(() => {
-    if (viewMode === 'view') {
-      const interval = setInterval(() => {
-        loadOrdersFromSheet();
-      }, 30000); // Refresh every 30 seconds
-      
-      return () => clearInterval(interval);
-    }
-  }, [viewMode]);
+function getMenuItem(menu, category, id) {
+  return menu?.[category]?.find((item) => item.id === id);
+}
 
-  const loadOrdersFromSheet = async () => {
-    if (SHEET_ID === 'YOUR_GOOGLE_SHEET_ID_HERE' || API_KEY === 'YOUR_API_KEY_HERE') {
-      console.log('Please configure SHEET_ID and API_KEY');
-      return;
-    }
+function MenuSection({ title, subtitle, items, selectedId, onSelect, disabledItem, accent = 'red', loading, children }) {
+  if (!items.length) return null;
+  const selectedClasses = accent === 'green'
+    ? 'bg-emerald-700 text-white border-emerald-800 shadow-md'
+    : 'bg-red-700 text-white border-red-800 shadow-md';
+  const hoverClasses = accent === 'green'
+    ? 'hover:border-emerald-400 hover:bg-emerald-50'
+    : 'hover:border-red-400 hover:bg-red-50';
 
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to load orders');
-      }
-
-      const data = await response.json();
-      
-      if (data.values && data.values.length > 1) {
-        // Skip header row, convert to guest objects
-        const loadedGuests = data.values.slice(1).map(row => ({
-          name: row[0] || '',
-          courses: parseInt(row[1]) || 2,
-          starter: row[2] || '',
-          main: row[3] || '',
-          dessert: row[4] || '',
-          steakPreference: row[5] || '',
-          orderDate: row[6] || ''
-        }));
-        
-        setGuests(loadedGuests);
-        setLastUpdate(new Date());
-      } else {
-        setGuests([]);
-      }
-    } catch (error) {
-      console.error('Error loading orders:', error);
-      alert('Unable to load orders from Google Sheets. Please check your configuration.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveOrderToSheet = async (newGuest) => {
-    if (SHEET_ID === 'YOUR_GOOGLE_SHEET_ID_HERE' || API_KEY === 'YOUR_API_KEY_HERE') {
-      alert('⚠️ Google Sheets not configured!\n\nPlease follow the setup instructions to connect to Google Sheets.');
-      return false;
-    }
-
-    try {
-      setLoading(true);
-      
-      // Prepare the row data
-      const rowData = [
-        newGuest.name,
-        newGuest.courses,
-        newGuest.starter,
-        newGuest.main,
-        newGuest.dessert,
-        newGuest.steakPreference,
-        newGuest.orderDate
-      ];
-
-      // Use Apps Script Web App to append data
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';
-      
-      const response = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors', // Required for Apps Script
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sheetId: SHEET_ID,
-          sheetName: SHEET_NAME,
-          values: [rowData]
-        })
-      });
-
-      // Since no-cors mode, we can't check response, so we'll reload to verify
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second for write
-      await loadOrdersFromSheet();
-      
-      return true;
-    } catch (error) {
-      console.error('Error saving order:', error);
-      alert('Failed to save order. Please try again.');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validation
-    if (!currentGuest.name) {
-      alert('Please enter your name!');
-      return;
-    }
-    
-    if (!currentGuest.main) {
-      alert('Please select a main dish!');
-      return;
-    }
-    
-    // Steak preference validation
-    if (currentGuest.main === 'm1' && !currentGuest.steakPreference) {
-      alert('Please select how you would like your steak cooked!');
-      return;
-    }
-    
-    // 3-course validation
-    if (currentGuest.courses === 3) {
-      if (!currentGuest.starter || !currentGuest.dessert) {
-        alert('For 3-course menu, please select Starter, Main, and Dessert!');
-        return;
-      }
-    }
-    
-    // 2-course validation - MUST have exactly 2 items
-    if (currentGuest.courses === 2) {
-      const selectedCount = [
-        currentGuest.starter, 
-        currentGuest.main, 
-        currentGuest.dessert
-      ].filter(item => item !== '').length;
-      
-      if (selectedCount !== 2) {
-        alert('For 2-course menu, please select exactly 2 items:\n\n• Main + Starter OR\n• Main + Dessert\n\n(You currently have ' + selectedCount + ' items selected)');
-        return;
-      }
-      
-      // Must have main + one other
-      if (!currentGuest.starter && !currentGuest.dessert) {
-        alert('For 2-course menu, please select Main + Starter OR Main + Dessert!');
-        return;
-      }
-    }
-    
-    const now = new Date();
-    const orderDate = now.toLocaleString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    const newGuest = {
-      ...currentGuest,
-      orderDate
-    };
-    
-    // Save to Google Sheets
-    const success = await saveOrderToSheet(newGuest);
-    
-    if (success) {
-      setCurrentGuest({
-        name: '',
-        courses: 2,
-        starter: '',
-        main: '',
-        dessert: '',
-        steakPreference: '',
-        orderDate: ''
-      });
-      
-      // Show success message
-      alert('Order submitted successfully! 🎄');
-      
-      // Automatically switch to "View All Orders" tab
-      setViewMode('view');
-    }
-  };
-
-  const clearAllOrders = async () => {
-    // Admin password protection
-    const password = window.prompt('🔐 Admin Access Required\n\nPlease enter the admin password to clear all orders:');
-    
-    if (password === null) {
-      return; // User clicked cancel
-    }
-    
-    // Check password (change "admin123" to your preferred password)
-    if (password !== 'admin123') {
-      alert('❌ Incorrect password. Access denied.');
-      return;
-    }
-    
-    // Password correct, proceed with confirmation
-    const confirmed = window.confirm(
-      '⚠️ WARNING: This will delete ALL orders from Google Sheets!\n\nAre you sure you want to clear all guest orders? This action cannot be undone.'
-    );
-    
-    if (confirmed) {
-      const doubleCheck = window.confirm(
-        '🚨 FINAL CONFIRMATION\n\nThis will permanently delete all ' + guests.length + ' orders from the Google Sheet.\n\nClick OK to proceed or Cancel to keep the orders.'
-      );
-      
-      if (doubleCheck) {
-        alert('⚠️ To clear all orders, please:\n1. Open your Google Sheet\n2. Select all order rows (not the header)\n3. Delete them manually\n\nThen refresh this page.');
-        // Note: We can't delete from sheets API directly with just API key
-        // User needs to do it manually or we'd need OAuth
-      }
-    }
-  };
-
-  const getItemName = (id, category) => {
-    const item = menuData[category].find(i => i.id === id);
-    return item ? item.name : '';
-  };
-
-  const exportOrders = () => {
-    let report = '═══════════════════════════════════════════════════════\n';
-    report += '         F&V CHRISTMAS DINNER - FINAL ORDERS\n';
-    report += '═══════════════════════════════════════════════════════\n\n';
-    report += `Total Guests: ${guests.length}\n`;
-    report += `Event Date: Tuesday 3rd December 2025\n\n`;
-    
-    let total2Course = guests.filter(g => g.courses === 2).length;
-    let total3Course = guests.filter(g => g.courses === 3).length;
-    let totalCost = (total2Course * 32) + (total3Course * 37);
-    
-    report += `2-Course Menu (£32): ${total2Course} guests\n`;
-    report += `3-Course Menu (£37): ${total3Course} guests\n`;
-    report += `TOTAL COST: £${totalCost}\n\n`;
-    report += '═══════════════════════════════════════════════════════\n';
-    report += '                   ORDER STATISTICS\n';
-    report += '                 (For Kitchen Preparation)\n';
-    report += '═══════════════════════════════════════════════════════\n\n';
-    
-    // Calculate statistics
-    const stats = getStats();
-    
-    // STARTERS
-    report += 'STARTERS:\n';
-    report += '─────────────────────────────────────────────────────\n';
-    let hasStarters = false;
-    menuData.starters.forEach(item => {
-      if (stats.starters[item.id] > 0) {
-        report += `  ${stats.starters[item.id]}x ${item.name}\n`;
-        hasStarters = true;
-      }
-    });
-    if (!hasStarters) report += '  None ordered\n';
-    report += '\n';
-    
-    // MAINS
-    report += 'MAIN COURSES:\n';
-    report += '─────────────────────────────────────────────────────\n';
-    menuData.mains.forEach(item => {
-      if (stats.mains[item.id] > 0) {
-        report += `  ${stats.mains[item.id]}x ${item.name}\n`;
-        
-        // If it's steak, show cooking preferences breakdown
-        if (item.id === 'm1') {
-          const steakPreferences = {};
-          guests.forEach(guest => {
-            if (guest.main === 'm1' && guest.steakPreference) {
-              // Normalize to proper case for consistent display
-              const normalized = guest.steakPreference.trim();
-              steakPreferences[normalized] = (steakPreferences[normalized] || 0) + 1;
-            }
-          });
-          
-          if (Object.keys(steakPreferences).length > 0) {
-            report += '     Cooking preferences:\n';
-            // Show all preferences found (in order of preference)
-            const preferenceOrder = ['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done', 'Well done'];
-            
-            // First show standard preferences
-            preferenceOrder.forEach(pref => {
-              if (steakPreferences[pref]) {
-                report += `       - ${steakPreferences[pref]}x ${pref}\n`;
-              }
-            });
-            
-            // Then show any other preferences not in standard list
-            Object.keys(steakPreferences).forEach(pref => {
-              if (!preferenceOrder.includes(pref)) {
-                report += `       - ${steakPreferences[pref]}x ${pref}\n`;
-              }
-            });
-          }
-        }
-      }
-    });
-    report += '\n';
-    
-    // DESSERTS
-    report += 'DESSERTS:\n';
-    report += '─────────────────────────────────────────────────────\n';
-    let hasDesserts = false;
-    menuData.desserts.forEach(item => {
-      if (stats.desserts[item.id] > 0) {
-        report += `  ${stats.desserts[item.id]}x ${item.name}\n`;
-        hasDesserts = true;
-      }
-    });
-    if (!hasDesserts) report += '  None ordered\n';
-    report += '\n';
-    
-    report += '═══════════════════════════════════════════════════════\n';
-    report += '                 INDIVIDUAL GUEST ORDERS\n';
-    report += '═══════════════════════════════════════════════════════\n\n';
-
-    guests.forEach((guest, index) => {
-      report += `${index + 1}. ${guest.name} (${guest.courses} courses - £${guest.courses === 2 ? '32' : '37'})\n`;
-      report += `   Ordered: ${guest.orderDate}\n`;
-      if (guest.starter) {
-        const starter = menuData.starters.find(s => s.id === guest.starter);
-        if (starter) report += `   Starter: ${starter.name} (${starter.tags.join(', ')})\n`;
-      }
-      if (guest.main) {
-        const mainName = getItemName(guest.main, 'mains');
-        report += `   Main: ${mainName}`;
-        if (guest.main === 'm1' && guest.steakPreference) {
-          report += ` (Cooked: ${guest.steakPreference})`;
-        }
-        report += '\n';
-      }
-      if (guest.dessert) {
-        const dessert = menuData.desserts.find(d => d.id === guest.dessert);
-        if (dessert) report += `   Dessert: ${dessert.name} (${dessert.tags.join(', ')})\n`;
-      }
-      report += '\n';
-    });
-
-    report += '═══════════════════════════════════════════════════════\n';
-    report += `Generated: ${new Date().toLocaleString('en-GB')}\n`;
-    report += '═══════════════════════════════════════════════════════\n';
-
-    const blob = new Blob([report], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Christmas_Dinner_Orders_${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-  };
-
-  const getStats = () => {
-    const stats = {
-      starters: {},
-      mains: {},
-      desserts: {}
-    };
-
-    menuData.starters.forEach(s => stats.starters[s.id] = 0);
-    menuData.mains.forEach(m => stats.mains[m.id] = 0);
-    menuData.desserts.forEach(d => stats.desserts[d.id] = 0);
-
-    guests.forEach(guest => {
-      if (guest.starter) stats.starters[guest.starter]++;
-      if (guest.main) stats.mains[guest.main]++;
-      if (guest.dessert) stats.desserts[guest.dessert]++;
-    });
-
-    return stats;
-  };
-
-  const stats = getStats();
-
-  // Handle course selection with 2-course restriction
+  return (
+    <fieldset>
+      <legend className="text-lg font-extrabold text-slate-800 mb-3">
+        {title} <span className="text-sm font-medium text-slate-500">{subtitle}</span>
+      </legend>
+      <div className={accent === 'green' ? 'space-y-3' : 'grid md:grid-cols-2 gap-3'}>
+        {items.map((item) => {
+          const unavailable = disabledItem?.(item);
+          const selected = selectedId === item.id;
+          return (
+            <div key={item.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(item.id)}
+                disabled={loading || unavailable}
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selected ? selectedClasses : unavailable ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60' : `bg-white border-slate-200 ${hoverClasses}`}`}
+              >
+                <span className="block font-bold text-sm leading-relaxed">{item.name}</span>
+                {item.description && <span className="block text-xs leading-relaxed mt-1 opacity-75">{item.description}</span>}
+                {!!item.tags?.length && <span className="block text-xs mt-1.5 opacity-75 uppercase tracking-wide">{item.tags.join(' · ')}</span>}
+              </button>
+              {selected && children?.(item)}
+            </div>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+function OrderForm({ menu, order, setOrder, loading, onSubmit, clientMode }) {
   const handleCourseSelect = (courseType, itemId) => {
-    if (currentGuest.courses === 2) {
-      // For 2-course menu
-      if (courseType === 'starter') {
-        // If selecting starter, clear dessert
-        setCurrentGuest({
-          ...currentGuest,
-          starter: currentGuest.starter === itemId ? '' : itemId,
-          dessert: ''
-        });
-      } else if (courseType === 'dessert') {
-        // If selecting dessert, clear starter
-        setCurrentGuest({
-          ...currentGuest,
-          dessert: currentGuest.dessert === itemId ? '' : itemId,
-          starter: ''
-        });
-      } else if (courseType === 'main') {
-        // Main course - clear steak preference if changing away from steak
-        const newMain = currentGuest.main === itemId ? '' : itemId;
-        setCurrentGuest({
-          ...currentGuest,
-          main: newMain,
-          steakPreference: newMain === 'm1' ? currentGuest.steakPreference : ''
-        });
+    setOrder((current) => {
+      const nextValue = current[courseType] === itemId ? '' : itemId;
+      if (current.courses === 2 && courseType === 'starter') {
+        return { ...current, starter: nextValue, dessert: '' };
       }
-    } else {
-      // For 3-course menu - normal toggle
+      if (current.courses === 2 && courseType === 'dessert') {
+        return { ...current, dessert: nextValue, starter: '' };
+      }
       if (courseType === 'main') {
-        const newMain = currentGuest.main === itemId ? '' : itemId;
-        setCurrentGuest({
-          ...currentGuest,
-          main: newMain,
-          steakPreference: newMain === 'm1' ? currentGuest.steakPreference : ''
-        });
-      } else {
-        setCurrentGuest({
-          ...currentGuest,
-          [courseType]: currentGuest[courseType] === itemId ? '' : itemId
-        });
+        const selectedItem = getMenuItem(menu, 'mains', nextValue);
+        return {
+          ...current,
+          main: nextValue,
+          steakPreference: itemNeedsPreference(selectedItem) ? current.steakPreference : '',
+        };
       }
+      return { ...current, [courseType]: nextValue };
+    });
+  };
+
+  return (
+    <section className="max-w-5xl mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/70 overflow-hidden">
+      <div className="bg-slate-950 text-white px-6 py-7 md:px-9 flex flex-col md:flex-row md:items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-300 mb-2">Your selection</p>
+          <h2 className="text-3xl font-black">Choose your meal</h2>
+        </div>
+        {clientMode && (
+          <span className="inline-flex items-center gap-2 text-sm text-emerald-200"><ShieldCheck size={17} /> Client menu version</span>
+        )}
+      </div>
+
+      <form onSubmit={onSubmit} className="p-6 md:p-9 space-y-8">
+        <label className="block">
+          <span className="block text-lg font-extrabold mb-2 text-slate-800">Your name *</span>
+          <input
+            type="text"
+            value={order.name}
+            onChange={(event) => setOrder((current) => ({ ...current, name: event.target.value }))}
+            className="field text-lg"
+            placeholder="Enter your full name"
+            required
+            disabled={loading}
+          />
+        </label>
+
+        <fieldset>
+          <legend className="text-lg font-extrabold mb-3 text-slate-800">Choose your package *</legend>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {[2, 3].map((courseCount) => {
+              const option = menu.courseOptions?.[courseCount];
+              if (!option) return null;
+              const selected = order.courses === courseCount;
+              return (
+                <button
+                  key={courseCount}
+                  type="button"
+                  onClick={() => setOrder((current) => ({ ...current, courses: courseCount, starter: '', dessert: '' }))}
+                  disabled={loading}
+                  className={`p-5 rounded-xl border-2 text-left transition-all ${selected ? 'bg-red-700 text-white border-red-800 shadow-lg -translate-y-0.5' : 'bg-white border-slate-200 hover:border-red-400'}`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-black text-lg">{option.label || `${courseCount} Courses`}</span>
+                    <span className={`font-black px-3 py-1 rounded-full ${selected ? 'bg-white/15' : 'bg-red-50 text-red-800'}`}>{priceLabel(option.price)}</span>
+                  </span>
+                  <span className="block text-sm mt-2 opacity-80">{courseCount === 2 ? 'Main + starter or dessert' : 'Starter + main + dessert'}</span>
+                </button>
+              );
+            })}
+          </div>
+          {order.courses === 2 && menu.starters.length > 0 && menu.desserts.length > 0 && (
+            <p className="mt-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 font-semibold">Choose either a starter or a dessert alongside your main.</p>
+          )}
+        </fieldset>
+
+        <MenuSection
+          title="Starters"
+          subtitle={order.courses === 3 ? '*' : '(choose this or dessert)'}
+          items={menu.starters}
+          selectedId={order.starter}
+          onSelect={(id) => handleCourseSelect('starter', id)}
+          disabledItem={() => order.courses === 2 && order.dessert}
+          loading={loading}
+        />
+
+        <MenuSection
+          title="Main course *"
+          subtitle=""
+          items={menu.mains}
+          selectedId={order.main}
+          onSelect={(id) => handleCourseSelect('main', id)}
+          accent="green"
+          loading={loading}
+        >
+          {(item) => itemNeedsPreference(item) && (
+            <div className="mt-3 ml-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <p className="font-extrabold text-slate-800 mb-3">How would you like it cooked? *</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done'].map((preference) => (
+                  <button
+                    key={preference}
+                    type="button"
+                    onClick={() => setOrder((current) => ({ ...current, steakPreference: preference }))}
+                    className={`px-2 py-2.5 rounded-lg border text-xs font-bold transition-colors ${order.steakPreference === preference ? 'bg-emerald-700 text-white border-emerald-800' : 'bg-white text-slate-700 border-slate-300 hover:border-emerald-500'}`}
+                  >
+                    {preference}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </MenuSection>
+
+        <MenuSection
+          title="Desserts"
+          subtitle={order.courses === 3 ? '*' : '(choose this or starter)'}
+          items={menu.desserts}
+          selectedId={order.dessert}
+          onSelect={(id) => handleCourseSelect('dessert', id)}
+          disabledItem={() => order.courses === 2 && order.starter}
+          loading={loading}
+        />
+
+        <button type="submit" disabled={loading} className="w-full py-4 px-5 text-lg font-black rounded-xl text-white bg-gradient-to-r from-red-800 via-red-700 to-emerald-800 shadow-lg hover:-translate-y-0.5 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0">
+          {loading ? 'Saving your selection…' : `Submit order · ${priceLabel(menu.courseOptions?.[order.courses]?.price)}`}
+        </button>
+      </form>
+    </section>
+  );
+}
+function OrdersView({ menu, guests, loading, lastUpdate, onRefresh, onExport }) {
+  const stats = useMemo(() => {
+    const result = { starters: {}, mains: {}, desserts: {} };
+    ['starters', 'mains', 'desserts'].forEach((category) => {
+      menu[category].forEach((item) => { result[category][item.id] = 0; });
+    });
+    guests.forEach((guest) => {
+      if (guest.starter && result.starters[guest.starter] !== undefined) result.starters[guest.starter] += 1;
+      if (guest.main && result.mains[guest.main] !== undefined) result.mains[guest.main] += 1;
+      if (guest.dessert && result.desserts[guest.dessert] !== undefined) result.desserts[guest.dessert] += 1;
+    });
+    return result;
+  }, [guests, menu]);
+
+  return (
+    <section className="max-w-6xl mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/70 overflow-hidden">
+      <div className="p-6 md:p-8 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-700 mb-1">{menu.title}</p>
+          <h2 className="text-3xl font-black text-slate-900">Guest orders <span className="text-slate-400">({guests.length})</span></h2>
+          {lastUpdate && <p className="text-sm text-slate-500 mt-2">Last synced at {lastUpdate.toLocaleTimeString('en-GB')}</p>}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button type="button" onClick={onRefresh} disabled={loading} className="px-5 py-3 bg-emerald-700 text-white rounded-xl font-bold hover:bg-emerald-800 flex items-center justify-center gap-2 disabled:opacity-50"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /> Refresh</button>
+          <button type="button" onClick={onExport} className="px-5 py-3 bg-blue-700 text-white rounded-xl font-bold hover:bg-blue-800 flex items-center justify-center gap-2"><Download size={18} /> Export orders</button>
+        </div>
+      </div>
+
+      <div className="p-6 md:p-8">
+        <div className="rounded-2xl bg-slate-950 text-white p-5 md:p-6 mb-7">
+          <h3 className="text-lg font-black mb-4">Kitchen totals</h3>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              ['starters', 'Starters'],
+              ['mains', 'Main courses'],
+              ['desserts', 'Desserts'],
+            ].map(([category, label]) => (
+              <div key={category}>
+                <h4 className="text-xs font-bold uppercase tracking-[0.16em] text-amber-300 mb-3">{label}</h4>
+                <div className="space-y-2 text-sm">
+                  {menu[category].filter((item) => stats[category][item.id] > 0).map((item) => (
+                    <p key={item.id} className="flex items-start gap-2"><strong className="text-emerald-300">{stats[category][item.id]}×</strong><span>{item.name}</span></p>
+                  ))}
+                  {!menu[category].some((item) => stats[category][item.id] > 0) && <p className="text-slate-400">None selected</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {!guests.length ? (
+          <div className="text-center py-14 text-slate-500"><Users size={56} className="mx-auto mb-4 opacity-30" /><p className="text-xl font-bold text-slate-700">No orders for this menu yet</p><p className="mt-2">Share its client link to start collecting selections.</p></div>
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-4">
+            {guests.map((guest, index) => {
+              const main = getMenuItem(menu, 'mains', guest.main);
+              return (
+                <article key={`${guest.name}-${guest.orderDate}-${index}`} className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                  <div className="flex justify-between items-start gap-4 mb-3">
+                    <h3 className="text-xl font-black text-slate-900">{guest.name}</h3>
+                    <span className="shrink-0 bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold">{guest.courses} courses · {priceLabel(menu.courseOptions?.[guest.courses]?.price)}</span>
+                  </div>
+                  <div className="space-y-2 text-sm text-slate-700">
+                    {guest.starter && <p><strong className="text-red-700">Starter:</strong> {getMenuItem(menu, 'starters', guest.starter)?.name || 'Menu item no longer available'}</p>}
+                    <p><strong className="text-emerald-700">Main:</strong> {main?.name || 'Menu item no longer available'} {guest.steakPreference && <span className="ml-1 inline-block bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs font-bold">{guest.steakPreference}</span>}</p>
+                    {guest.dessert && <p><strong className="text-red-700">Dessert:</strong> {getMenuItem(menu, 'desserts', guest.dessert)?.name || 'Menu item no longer available'}</p>}
+                    <p className="pt-1 flex items-center gap-1.5 text-xs text-slate-500"><Calendar size={13} /> {guest.orderDate}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+function AdminLogin({ onLogin, onCancel }) {
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await onLogin(username.trim(), password);
+    } catch (loginError) {
+      setError(loginError.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{
-      background: 'linear-gradient(135deg, #165B33 0%, #8B0000 25%, #C41E3A 50%, #8B0000 75%, #0F4C23 100%)'
-    }}>
-      {/* Floating Christmas decorations */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-10 left-10 text-6xl animate-bounce">⛄</div>
-        <div className="absolute top-20 right-20 text-6xl animate-bounce" style={{animationDelay: '0.5s'}}>☃️</div>
-        <div className="absolute bottom-20 left-20 text-7xl animate-bounce" style={{animationDelay: '1s'}}>🎅</div>
-        <div className="absolute bottom-32 right-32 text-6xl animate-bounce" style={{animationDelay: '1.5s'}}>⛄</div>
-        
-        {[...Array(15)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute text-3xl opacity-60"
-            style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animation: `float ${5 + Math.random() * 5}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 2}s`
-            }}
-          >
-            ❄️
-          </div>
-        ))}
+    <section className="max-w-md mx-auto rounded-2xl bg-white/95 p-7 md:p-9 shadow-2xl border border-white/70">
+      <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-amber-300">
+        <LockKeyhole size={28} />
+      </div>
+      <div className="text-center mb-7">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700 mb-2">Private area</p>
+        <h2 className="text-3xl font-black text-slate-950">Admin sign in</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">Only the administrator can import menus, manage versions, or view all orders.</p>
       </div>
 
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <label className="block">
+          <span className="block text-sm font-extrabold mb-2 text-slate-800">Username</span>
+          <input className="field" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required disabled={submitting} />
+        </label>
+        <label className="block">
+          <span className="block text-sm font-extrabold mb-2 text-slate-800">Password</span>
+          <input className="field" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required disabled={submitting} />
+        </label>
+        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{error}</p>}
+        <button type="submit" disabled={submitting} className="w-full rounded-xl bg-slate-950 px-5 py-3.5 font-black text-white transition-colors hover:bg-slate-800 disabled:opacity-50">
+          {submitting ? 'Signing in…' : 'Sign in as admin'}
+        </button>
+        <button type="button" onClick={onCancel} disabled={submitting} className="w-full px-5 py-2 text-sm font-bold text-slate-600 hover:text-slate-950 disabled:opacity-50">Back to the menu</button>
+      </form>
+    </section>
+  );
+}
+export default function ChristmasMenuSelector() {
+  const clientMode = Boolean(SHARED_MENU);
+  const [menus, setMenus] = useState(() => SHARED_MENU ? [SHARED_MENU] : readStoredMenus());
+  const requestedMenuId = new URLSearchParams(window.location.search).get('menu');
+  const [activeMenuId, setActiveMenuId] = useState(() => SHARED_MENU?.id || requestedMenuId || menus[0].id);
+  const [order, setOrder] = useState(emptyOrder);
+  const [guests, setGuests] = useState([]);
+  const [viewMode, setViewMode] = useState('form');
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [message, setMessage] = useState('');
+  const [isAdmin, setIsAdmin] = useState(() => !clientMode && import.meta.env.DEV);
+  const [authChecking, setAuthChecking] = useState(() => !clientMode && !import.meta.env.DEV);
+
+  const activeMenu = menus.find((menu) => menu.id === activeMenuId) || menus[0] || DEFAULT_MENU;
+  const activeGuests = guests.filter((guest) => guest.menuId === activeMenu.id || (!guest.menuId && activeMenu.id === DEFAULT_MENU.id));
+
+  useEffect(() => {
+    if (!clientMode) storeMenus(menus);
+  }, [clientMode, menus]);
+
+  useEffect(() => {
+    if (clientMode || import.meta.env.DEV) return undefined;
+    let current = true;
+    getAdminSession()
+      .then((session) => {
+        if (current) setIsAdmin(Boolean(session.authenticated));
+      })
+      .catch(() => {
+        if (current) setIsAdmin(false);
+      })
+      .finally(() => {
+        if (current) setAuthChecking(false);
+      });
+    return () => { current = false; };
+  }, [clientMode]);
+
+  const loadOrdersFromSheet = useCallback(async (quiet = false) => {
+    try {
+      if (!quiet) setLoading(true);
+      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`);
+      if (!response.ok) throw new Error('Failed to load orders');
+      const data = await response.json();
+      const loaded = (data.values || []).slice(1).map((row) => ({
+        name: row[0] || '',
+        courses: Number.parseInt(row[1], 10) || 2,
+        starter: row[2] || '',
+        main: row[3] || '',
+        dessert: row[4] || '',
+        steakPreference: row[5] || '',
+        orderDate: row[6] || '',
+        menuId: row[7] || DEFAULT_MENU.id,
+        menuTitle: row[8] || DEFAULT_MENU.title,
+      }));
+      setGuests(loaded);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      if (!quiet) setMessage('Orders could not be loaded from Google Sheets. Please check the connection and try again.');
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!clientMode && isAdmin) loadOrdersFromSheet();
+  }, [clientMode, isAdmin, loadOrdersFromSheet]);
+
+  useEffect(() => {
+    if (viewMode !== 'view' || !isAdmin) return undefined;
+    const interval = window.setInterval(() => loadOrdersFromSheet(true), 30000);
+    return () => window.clearInterval(interval);
+  }, [isAdmin, loadOrdersFromSheet, viewMode]);
+
+  const handleAdminLogin = async (username, password) => {
+    await loginAsAdmin(username, password);
+    setIsAdmin(true);
+    setMessage('Admin access granted successfully.');
+    setViewMode('manage');
+  };
+
+  const handleAdminLogout = async () => {
+    try {
+      if (!import.meta.env.DEV) await logoutAdmin();
+    } finally {
+      setIsAdmin(false);
+      setGuests([]);
+      setMessage('You have signed out of the admin area.');
+      setViewMode('form');
+    }
+  };
+
+  const activateMenu = (menuId) => {
+    setActiveMenuId(menuId);
+    setOrder(emptyOrder());
+    setMessage('');
+    setViewMode('form');
+  };
+
+  const saveMenu = (menu) => {
+    setMenus((current) => current.some((item) => item.id === menu.id)
+      ? current.map((item) => item.id === menu.id ? menu : item)
+      : [...current, menu]);
+    setActiveMenuId(menu.id);
+  };
+
+  const deleteMenu = (menuId) => {
+    const menu = menus.find((item) => item.id === menuId);
+    if (!menu || !window.confirm(`Delete the saved menu version “${menu.title}”? Existing Google Sheets orders will not be deleted.`)) return;
+    const remaining = menus.filter((item) => item.id !== menuId);
+    setMenus(remaining);
+    if (activeMenuId === menuId) activateMenu(remaining[0].id);
+  };
+
+  const saveOrderToSheet = async (guest) => {
+    setLoading(true);
+    try {
+      const rowData = [
+        guest.name,
+        guest.courses,
+        guest.starter,
+        guest.main,
+        guest.dessert,
+        guest.steakPreference,
+        guest.orderDate,
+        activeMenu.id,
+        activeMenu.title,
+      ];
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheetId: SHEET_ID, sheetName: SHEET_NAME, values: [rowData] }),
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      if (!clientMode) await loadOrdersFromSheet(true);
+      return true;
+    } catch (error) {
+      console.error('Error saving order:', error);
+      setMessage('Your order could not be saved. Please try again.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitOrder = async (event) => {
+    event.preventDefault();
+    setMessage('');
+    if (!order.name.trim()) return setMessage('Please enter your name.');
+    if (!order.main) return setMessage('Please select a main course.');
+
+    const main = getMenuItem(activeMenu, 'mains', order.main);
+    if (itemNeedsPreference(main) && !order.steakPreference) return setMessage('Please choose how you would like your steak cooked.');
+
+    if (order.courses === 3) {
+      if (activeMenu.starters.length && !order.starter) return setMessage('Please select a starter for the 3-course menu.');
+      if (activeMenu.desserts.length && !order.dessert) return setMessage('Please select a dessert for the 3-course menu.');
+    }
+    if (order.courses === 2 && (activeMenu.starters.length || activeMenu.desserts.length)) {
+      if (!order.starter && !order.dessert) return setMessage('Please select a starter or dessert for the 2-course menu.');
+      if (order.starter && order.dessert) return setMessage('For the 2-course menu, select a starter or dessert, not both.');
+    }
+
+    const orderDate = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    const saved = await saveOrderToSheet({ ...order, name: order.name.trim(), orderDate });
+    if (saved) {
+      setOrder(emptyOrder());
+      setMessage('Your order was submitted successfully.');
+      setViewMode(clientMode ? 'form' : 'view');
+    }
+  };
+
+  const exportOrders = () => {
+    const lines = [
+      '=======================================================',
+      `${activeMenu.title.toUpperCase()} - FINAL ORDERS`,
+      '=======================================================',
+      '',
+      `Menu version: ${activeMenu.id}`,
+      `Event date: ${formatEventDate(activeMenu.eventDate)}`,
+      `Total guests: ${activeGuests.length}`,
+      ...[2, 3].map((count) => {
+        const total = activeGuests.filter((guest) => guest.courses === count).length;
+        return `${count}-course menu (${priceLabel(activeMenu.courseOptions?.[count]?.price)}): ${total}`;
+      }),
+      '',
+      'KITCHEN TOTALS',
+      '-------------------------------------------------------',
+    ];
+
+    ['starters', 'mains', 'desserts'].forEach((category) => {
+      lines.push('', category.toUpperCase());
+      activeMenu[category].forEach((item) => {
+        const field = category === 'mains' ? 'main' : category.slice(0, -1);
+        const selected = activeGuests.filter((guest) => guest[field] === item.id);
+        if (selected.length) {
+          lines.push(`${selected.length}x ${item.name}`);
+          if (itemNeedsPreference(item)) {
+            const preferences = selected.reduce((totals, guest) => {
+              if (guest.steakPreference) totals[guest.steakPreference] = (totals[guest.steakPreference] || 0) + 1;
+              return totals;
+            }, {});
+            Object.entries(preferences).forEach(([preference, count]) => lines.push(`   ${count}x ${preference}`));
+          }
         }
-      `}</style>
+      });
+    });
 
-      <div className="container mx-auto px-4 py-8 relative z-10">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">
-            🎄 F&V Christmas Dinner 🎄
-          </h1>
-          <p className="text-xl text-red-100 drop-shadow">
-            Tuesday 3rd December 2025
-          </p>
-        </div>
+    lines.push('', 'INDIVIDUAL ORDERS', '-------------------------------------------------------');
+    activeGuests.forEach((guest, index) => {
+      lines.push('', `${index + 1}. ${guest.name} (${guest.courses} courses)`, `   Ordered: ${guest.orderDate}`);
+      if (guest.starter) lines.push(`   Starter: ${getMenuItem(activeMenu, 'starters', guest.starter)?.name || guest.starter}`);
+      lines.push(`   Main: ${getMenuItem(activeMenu, 'mains', guest.main)?.name || guest.main}${guest.steakPreference ? ` (${guest.steakPreference})` : ''}`);
+      if (guest.dessert) lines.push(`   Dessert: ${getMenuItem(activeMenu, 'desserts', guest.dessert)?.name || guest.dessert}`);
+    });
+    lines.push('', `Generated: ${new Date().toLocaleString('en-GB')}`);
 
-        <div className="flex justify-center gap-4 mb-6">
-          <button
-            onClick={() => setViewMode('form')}
-            className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
-              viewMode === 'form'
-                ? 'bg-white text-red-700 shadow-lg scale-105'
-                : 'bg-white/80 text-gray-700 hover:bg-white'
-            }`}
-          >
-            <ChefHat size={20} /> Place Order
-          </button>
-          <button
-            onClick={() => {
-              setViewMode('view');
-              loadOrdersFromSheet();
-            }}
-            className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-all ${
-              viewMode === 'view'
-                ? 'bg-green-600 text-white shadow-lg scale-105'
-                : 'bg-green-500 text-white hover:bg-green-600'
-            }`}
-          >
-            <Users size={20} /> View All Orders ({guests.length})
-          </button>
-        </div>
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${activeMenu.title.replace(/[^a-z0-9]+/gi, '_')}_orders_${new Date().toISOString().slice(0, 10)}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
-        {loading && (
-          <div className="fixed top-4 right-4 bg-white rounded-lg shadow-lg p-4 flex items-center gap-2">
-            <RefreshCw className="animate-spin" size={20} />
-            <span>Syncing with Google Sheets...</span>
-          </div>
-        )}
-
-        {viewMode === 'form' ? (
-          <div className="max-w-6xl mx-auto bg-white/95 backdrop-blur rounded-xl shadow-2xl p-8 border-4 border-red-600">
-            <h2 className="text-3xl font-bold text-center mb-6 text-red-700">
-              🎅 Place Your Order 🎄
-            </h2>
-
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div>
-                <label className="block text-lg font-semibold mb-2 text-gray-700">
-                  Your Name *
-                </label>
-                <input
-                  type="text"
-                  value={currentGuest.name}
-                  onChange={(e) => setCurrentGuest({...currentGuest, name: e.target.value})}
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-red-500 focus:outline-none text-lg"
-                  placeholder="Enter your name"
-                  required
-                  disabled={loading}
-                />
-              </div>
-
-              <div>
-                <label className="block text-lg font-semibold mb-3 text-gray-700">
-                  Choose Your Menu *
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentGuest({
-                        ...currentGuest, 
-                        courses: 2,
-                        starter: '',
-                        dessert: ''
-                      });
-                    }}
-                    disabled={loading}
-                    className={`p-4 rounded-lg border-3 font-semibold transition-all ${
-                      currentGuest.courses === 2
-                        ? 'bg-red-600 text-white border-red-700 scale-105'
-                        : 'bg-white border-gray-300 hover:border-red-400'
-                    }`}
-                  >
-                    2 Courses - £32<br/>
-                    <span className="text-sm opacity-90">Main + (Starter OR Dessert)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentGuest({...currentGuest, courses: 3})}
-                    disabled={loading}
-                    className={`p-4 rounded-lg border-3 font-semibold transition-all ${
-                      currentGuest.courses === 3
-                        ? 'bg-green-600 text-white border-green-700 scale-105'
-                        : 'bg-white border-gray-300 hover:border-green-400'
-                    }`}
-                  >
-                    3 Courses - £37<br/>
-                    <span className="text-sm opacity-90">Starter + Main + Dessert</span>
-                  </button>
-                </div>
-                
-                {currentGuest.courses === 2 && (
-                  <div className="mt-2 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
-                    <p className="text-sm text-yellow-800 font-semibold">
-                      ⚠️ 2-Course Menu: Select Main + EITHER Starter OR Dessert (not both)
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* STARTERS GRID */}
-              <div>
-                <label className="block text-lg font-semibold mb-3 text-gray-700">
-                  Starters {currentGuest.courses === 3 ? '*' : '(Optional - choose this OR dessert)'}
-                </label>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {menuData.starters.map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleCourseSelect('starter', item.id)}
-                      disabled={loading || (currentGuest.courses === 2 && currentGuest.dessert && currentGuest.starter !== item.id)}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        currentGuest.starter === item.id
-                          ? 'bg-red-600 text-white border-red-700 scale-105'
-                          : currentGuest.courses === 2 && currentGuest.dessert
-                          ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-50'
-                          : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50'
-                      }`}
-                    >
-                      <div className="font-semibold text-sm mb-1">{item.name}</div>
-                      <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* MAINS GRID */}
-              <div>
-                <label className="block text-lg font-semibold mb-3 text-gray-700">
-                  Main Course *
-                </label>
-                <div className="space-y-3">
-                  {menuData.mains.map(item => (
-                    <div key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleCourseSelect('main', item.id)}
-                        disabled={loading}
-                        className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                          currentGuest.main === item.id
-                            ? 'bg-green-600 text-white border-green-700 scale-105'
-                            : 'bg-white border-gray-300 hover:border-green-400 hover:bg-green-50'
-                        }`}
-                      >
-                        <div className="font-semibold text-sm mb-1">{item.name}</div>
-                        <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
-                      </button>
-                      
-                      {/* STEAK PREFERENCE (shows directly under steak when selected) */}
-                      {item.id === 'm1' && currentGuest.main === 'm1' && (
-                        <div className="mt-3 ml-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg">
-                          <label className="block text-base font-semibold mb-3 text-gray-700">
-                            🥩 How would you like your steak cooked? *
-                          </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {['Rare', 'Medium-Rare', 'Medium', 'Medium-Well', 'Well Done'].map(preference => (
-                              <button
-                                key={preference}
-                                type="button"
-                                onClick={() => setCurrentGuest({...currentGuest, steakPreference: preference})}
-                                disabled={loading}
-                                className={`p-2 rounded-lg border-2 font-semibold text-sm transition-all ${
-                                  currentGuest.steakPreference === preference
-                                    ? 'bg-green-600 text-white border-green-700 scale-105'
-                                    : 'bg-white border-gray-300 hover:border-green-400 hover:bg-green-50'
-                                }`}
-                              >
-                                {preference}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* DESSERTS GRID */}
-              <div>
-                <label className="block text-lg font-semibold mb-3 text-gray-700">
-                  Desserts {currentGuest.courses === 3 ? '*' : '(Optional - choose this OR starter)'}
-                </label>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {menuData.desserts.map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleCourseSelect('dessert', item.id)}
-                      disabled={loading || (currentGuest.courses === 2 && currentGuest.starter && currentGuest.dessert !== item.id)}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        currentGuest.dessert === item.id
-                          ? 'bg-red-600 text-white border-red-700 scale-105'
-                          : currentGuest.courses === 2 && currentGuest.starter
-                          ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-50'
-                          : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50'
-                      }`}
-                    >
-                      <div className="font-semibold text-sm mb-1">{item.name}</div>
-                      <div className="text-xs opacity-75">({item.tags.join(', ')})</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 text-xl font-bold rounded-lg text-white transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: 'linear-gradient(90deg, #C41E3A 0%, #0F4C23 50%, #C41E3A 100%)'
-                }}
-              >
-                {loading ? '⏳ Saving...' : `🎅 Submit Order (£${currentGuest.courses === 2 ? '32' : '37'}) 🎄`}
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-white/95 backdrop-blur rounded-xl shadow-2xl p-6 mb-6 border-4 border-green-600">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-3xl font-bold text-green-700 flex items-center gap-3">
-                  🎅 All Orders 🤶
-                </h2>
-                <div className="flex gap-3">
-                  <button
-                    onClick={loadOrdersFromSheet}
-                    disabled={loading}
-                    className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} /> Refresh
-                  </button>
-                  <button
-                    onClick={exportOrders}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all flex items-center gap-2"
-                  >
-                    <Download size={20} /> Export Orders
-                  </button>
-                </div>
-              </div>
-
-              {lastUpdate && (
-                <div className="text-sm text-gray-500 mb-4">
-                  Last updated: {lastUpdate.toLocaleTimeString('en-GB')}
-                </div>
-              )}
-
-              {/* STATISTICS SECTION */}
-              <div className="bg-red-50 rounded-lg p-4 mb-6 border-2 border-red-200">
-                <h3 className="text-xl font-bold text-red-700 mb-3">📊 Order Statistics</h3>
-                
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Starters:</h4>
-                    {menuData.starters.map(item => (
-                      stats.starters[item.id] > 0 && (
-                        <div key={item.id} className="text-sm mb-1">
-                          <span className="font-medium">{stats.starters[item.id]}x</span> {item.name.split('+')[0]}
-                        </div>
-                      )
-                    ))}
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Mains:</h4>
-                    {menuData.mains.map(item => (
-                      stats.mains[item.id] > 0 && (
-                        <div key={item.id} className="text-sm mb-1">
-                          <span className="font-medium">{stats.mains[item.id]}x</span> {item.name.split('+')[0]}
-                        </div>
-                      )
-                    ))}
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Desserts:</h4>
-                    {menuData.desserts.map(item => (
-                      stats.desserts[item.id] > 0 && (
-                        <div key={item.id} className="text-sm mb-1">
-                          <span className="font-medium">{stats.desserts[item.id]}x</span> {item.name.split('+')[0]}
-                        </div>
-                      )
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {guests.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Users size={64} className="mx-auto mb-4 opacity-30" />
-                  <p className="text-xl">No orders yet. Be the first to order! 🎄</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {guests.map((guest, index) => (
-                    <div key={index} className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200 hover:border-green-400 transition-all">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-xl font-bold text-gray-800">{guest.name}</h3>
-                        <div className="text-right">
-                          <span className="inline-block bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">
-                            {guest.courses} courses - £{guest.courses === 2 ? '32' : '37'}
-                          </span>
-                          <div className="flex items-center gap-1 text-sm text-gray-500 mt-1 justify-end">
-                            <Calendar size={14} />
-                            <span>{guest.orderDate}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1 text-sm">
-                        {guest.starter && (
-                          <p>
-                            <span className="font-semibold text-red-600">Starter:</span>{' '}
-                            {getItemName(guest.starter, 'starters')}
-                          </p>
-                        )}
-                        <p>
-                          <span className="font-semibold text-green-600">Main:</span>{' '}
-                          {getItemName(guest.main, 'mains')}
-                          {guest.main === 'm1' && guest.steakPreference && (
-                            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
-                              🥩 {guest.steakPreference}
-                            </span>
-                          )}
-                        </p>
-                        {guest.dessert && (
-                          <p>
-                            <span className="font-semibold text-red-600">Dessert:</span>{' '}
-                            {getItemName(guest.dessert, 'desserts')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+  return (
+    <main className="min-h-screen relative overflow-hidden bg-slate-950">
+      <div className="festive-background" aria-hidden="true" />
+      <div className="snowfield" aria-hidden="true">
+        {Array.from({ length: 18 }, (_, index) => <span key={index} style={{ '--i': index }}>✦</span>)}
       </div>
-    </div>
+
+      <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
+        <header className="text-center mb-8">
+          <p className="text-xs md:text-sm font-bold uppercase tracking-[0.35em] text-amber-300 mb-3">Festive dining</p>
+          <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-lg">{activeMenu.title}</h1>
+          <p className="text-lg md:text-xl text-red-100 mt-3">{formatEventDate(activeMenu.eventDate)}</p>
+          {clientMode && <p className="mt-4 inline-flex items-center gap-2 text-sm text-white/75"><ExternalLink size={15} /> You are viewing a shared client menu</p>}
+        </header>
+
+        {!clientMode && isAdmin && menus.length > 1 && (
+          <div className="max-w-md mx-auto mb-5">
+            <label className="block text-xs uppercase tracking-wider font-bold text-white/70 mb-2 text-center">Active menu version</label>
+            <select value={activeMenu.id} onChange={(event) => activateMenu(event.target.value)} className="field font-bold text-center">
+              {menus.map((menu) => <option key={menu.id} value={menu.id}>{menu.title}</option>)}
+            </select>
+          </div>
+        )}
+
+        <nav className="flex flex-wrap justify-center gap-2 mb-7" aria-label="Main navigation">
+          <button type="button" onClick={() => setViewMode('form')} className={`nav-button ${viewMode === 'form' ? 'nav-button-active' : ''}`}><ChefHat size={18} /> Place order</button>
+          {!clientMode && isAdmin && <button type="button" onClick={() => { setViewMode('view'); loadOrdersFromSheet(); }} className={`nav-button ${viewMode === 'view' ? 'nav-button-active' : ''}`}><Users size={18} /> Orders <span className="nav-count">{activeGuests.length}</span></button>}
+          {!clientMode && isAdmin && <button type="button" onClick={() => setViewMode('manage')} className={`nav-button ${viewMode === 'manage' ? 'nav-button-active' : ''}`}><Library size={18} /> Menus</button>}
+          {!clientMode && !authChecking && !isAdmin && <button type="button" onClick={() => setViewMode('admin')} className={`nav-button ${viewMode === 'admin' ? 'nav-button-active' : ''}`}><LogIn size={18} /> Admin</button>}
+          {!clientMode && isAdmin && !import.meta.env.DEV && <button type="button" onClick={handleAdminLogout} className="nav-button"><LogOut size={18} /> Sign out</button>}
+        </nav>
+
+        {loading && <div className="fixed top-4 right-4 z-50 bg-white rounded-xl shadow-xl px-4 py-3 flex items-center gap-2 text-sm font-bold text-slate-800"><RefreshCw className="animate-spin" size={17} /> Syncing…</div>}
+        {message && <div className={`max-w-5xl mx-auto mb-5 px-4 py-3 rounded-xl border font-semibold ${message.includes('successfully') ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-950'}`}>{message}</div>}
+
+        {viewMode === 'form' && <OrderForm menu={activeMenu} order={order} setOrder={setOrder} loading={loading} onSubmit={submitOrder} clientMode={clientMode} />}
+        {viewMode === 'admin' && !clientMode && !isAdmin && <AdminLogin onLogin={handleAdminLogin} onCancel={() => setViewMode('form')} />}
+        {viewMode === 'view' && isAdmin && <OrdersView menu={activeMenu} guests={activeGuests} loading={loading} lastUpdate={lastUpdate} onRefresh={() => loadOrdersFromSheet()} onExport={exportOrders} />}
+        {viewMode === 'manage' && !clientMode && isAdmin && <MenuManager menus={menus} activeMenuId={activeMenu.id} onActivate={activateMenu} onSave={saveMenu} onDelete={deleteMenu} />}
+      </div>
+    </main>
   );
 }

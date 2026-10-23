@@ -14,7 +14,21 @@ const HEADING_WORDS = {
 };
 
 const SKIP_LINE = /^(menu|christmas menu|festive menu|allergens?|dietary information|please ask|prices? include|available from|terms|v\s*=|vg\s*=|gf\s*=|celebrating our|in traditional|pre-?order payment)/i;
+const FOOTER_FRAGMENT = /(?:connections?\s+and\s+achievements|bring\s+the\s+\d{4}\s+network|network(?:ing)?\s+calendar|calendar\s+to\s+a\s+close)/i;
 const TAG_PATTERN = 'vgo|gfo|voa|vegan|vegetarian|vg|gf|v';
+
+function isNonMenuLine(line) {
+  return SKIP_LINE.test(line) || FOOTER_FRAGMENT.test(line);
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stripRepeatedTitle(description, title) {
+  const repeatedTitle = new RegExp(`^${escapeRegExp(title.trim())}(?:\\s+|\\s*[—–:-]\\s*)`, 'i');
+  return description.replace(repeatedTitle, '').trim();
+}
 
 function splitCollapsedMenuLine(value) {
   const text = String(value || '').trim();
@@ -149,7 +163,7 @@ function extractTags(line) {
 function makeItem(category, line, index) {
   const { name: itemText, tags } = extractTags(cleanLine(line));
   const [name, ...descriptionParts] = itemText.split(/\s+[—–]\s+/);
-  const description = descriptionParts.join(' — ').trim();
+  const description = stripRepeatedTitle(descriptionParts.join(' — ').trim(), name);
   const hashSource = `${name}|${description}`;
   const hash = [...hashSource].reduce((value, character) => ((value * 31) + character.charCodeAt(0)) >>> 0, 7).toString(36);
   return {
@@ -190,12 +204,12 @@ export function parseMenuText(text) {
       foundHeading = true;
       return;
     }
-    if (!currentCategory || SKIP_LINE.test(line) || /^\d\s*(?:course|courses)/i.test(line) || line.length < 3) return;
+    if (!currentCategory || isNonMenuLine(line) || /^\d\s*(?:course|courses)/i.test(line) || line.length < 3) return;
     sections[currentCategory].push(line);
   });
 
   if (!foundHeading) {
-    sections.mains = lines.filter((line) => !SKIP_LINE.test(line) && !/^\d\s*(?:course|courses)/i.test(line) && line.length > 2);
+    sections.mains = lines.filter((line) => !isNonMenuLine(line) && !/^\d\s*(?:course|courses)/i.test(line) && line.length > 2);
   }
 
   const parsedSections = Object.fromEntries(
@@ -313,7 +327,7 @@ export function groupOcrColumnLines(inputLines = [], category) {
   const headingIndex = ordered.findIndex((entry) => headingPattern?.test(entry.text));
   if (headingIndex < 0) return [];
 
-  const menuLines = ordered.slice(headingIndex + 1).filter((entry) => !SKIP_LINE.test(entry.text));
+  const menuLines = ordered.slice(headingIndex + 1).filter((entry) => !isNonMenuLine(entry.text));
   if (!menuLines.length) return [];
   const threshold = gapThreshold(menuLines);
   if (!threshold) return menuLines.map((entry) => entry.text);
@@ -333,7 +347,10 @@ export function groupOcrColumnLines(inputLines = [], category) {
   items.push(current);
 
   return items.map(({ title, details }) => {
-    const description = details.join(' ').replace(/\(£(\d+(?:\.\d+)?)\s+supplement\)/i, '(£$1 supplement)');
+    const description = stripRepeatedTitle(
+      details.join(' ').replace(/\(£(\d+(?:\.\d+)?)\s+supplement\)/i, '(£$1 supplement)'),
+      title,
+    );
     return description ? `${title} — ${description}` : title;
   });
 }

@@ -141,6 +141,43 @@ test('recovers dessert boundaries from a flattened browser OCR result', () => {
   ]);
 });
 
+test('removes cropped poster footer fragments and a repeated dessert title', () => {
+  const desserts = groupOcrColumnLines([
+    line('DESSERTS', 75, 46),
+    line('Dark Cherry & Chocolate Brownie', 196, 41),
+    line('Madagascan vanilla ice cream & warm chocolate sauce', 276, 33),
+    line('Apple, Blackberry & Cinnamon Crumble', 405, 42),
+    line('Served with custard', 485, 26),
+    line('Warm Christmas Pudding', 614, 42),
+    line('Brandy sauce', 694, 31),
+    line('Layered Salted Caramel Cheesecake', 814, 42),
+    line('Layered Salted Caramel Cheesecake', 850, 42),
+    line('Whipped cream & honeycomb', 899, 32),
+    line('king calendar to a close.', 1010, 32),
+  ], 'desserts');
+
+  assert.deepEqual(desserts, [
+    'Dark Cherry & Chocolate Brownie — Madagascan vanilla ice cream & warm chocolate sauce',
+    'Apple, Blackberry & Cinnamon Crumble — Served with custard',
+    'Warm Christmas Pudding — Brandy sauce',
+    'Layered Salted Caramel Cheesecake — Whipped cream & honeycomb',
+  ]);
+
+  const mains = groupOcrColumnLines([
+    line('MAINS', 75, 46),
+    line('Pan Fried Chicken Supreme', 196, 42),
+    line('Crushed new potatoes, buttered greens & tarragon cream', 276, 32),
+    line('10oz Fillet Mignon', 405, 42),
+    line('Fries, tenderstem broccoli, flat mushroom & Port and Stilton sauce', 485, 32),
+    line('inity, connections and achievements as we bring the 2026 networkl', 614, 32),
+  ], 'mains');
+
+  assert.deepEqual(mains, [
+    'Pan Fried Chicken Supreme — Crushed new potatoes, buttered greens & tarragon cream',
+    '10oz Fillet Mignon — Fries, tenderstem broccoli, flat mushroom & Port and Stilton sauce',
+  ]);
+});
+
 test('parses this poster into 4 starters, 5 mains and 4 desserts with prices', () => {
   const text = `
 2COURSES £40 | 3 COURSES £45

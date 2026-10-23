@@ -104,5 +104,5 @@ export function formatEventDate(value) {
 }
 
 export function itemNeedsPreference(item) {
-  return /\bsteak\b/i.test(item?.name || '');
+  return /\b(?:steak|sirloin|fil(?:e|le)t\s+mignon|rib[ -]?eye|rump|t[ -]?bone|porterhouse|beef\s+fillet)\b/i.test(item?.name || '');
 }

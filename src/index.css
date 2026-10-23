@@ -231,6 +231,32 @@
   transform-origin: 73% 62%;
 }
 
+.christmas-tree-lights {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.tree-light {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.28;
+  background: var(--colour);
+  box-shadow:
+    0 0 0.18rem var(--colour),
+    0 0 0.5rem var(--colour),
+    0 0 0.9rem color-mix(in srgb, var(--colour) 68%, transparent);
+  transform: translate(-50%, -50%) scale(0.62);
+  animation: tree-twinkle var(--duration) var(--delay) ease-in-out infinite;
+  will-change: transform, opacity, filter;
+}
+
 .table-flames {
   position: absolute;
   inset: 0;
@@ -371,6 +397,29 @@
   100% { opacity: 0.84; transform: translate(-50%, -100%) scale(0.9, 1.04) rotate(-2deg); }
 }
 
+@keyframes tree-twinkle {
+  0%, 100% {
+    opacity: 0.24;
+    filter: brightness(0.72);
+    transform: translate(-50%, -50%) scale(0.62);
+  }
+  36% {
+    opacity: 0.56;
+    filter: brightness(1.1);
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  48% {
+    opacity: 1;
+    filter: brightness(1.65);
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+  64% {
+    opacity: 0.42;
+    filter: brightness(0.94);
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+}
+
 @media (max-width: 1023px) {
   .hero-stage {
     grid-template-columns: 1fr;
@@ -447,6 +496,26 @@
   .guest-right {
     -webkit-mask-image: radial-gradient(ellipse 23% 44% at 79% 40%, #000 46%, rgba(0, 0, 0, 0.8) 62%, transparent 79%);
     mask-image: radial-gradient(ellipse 23% 44% at 79% 40%, #000 46%, rgba(0, 0, 0, 0.8) 62%, transparent 79%);
+  }
+
+  .tree-light {
+    width: calc(var(--size) + 1px);
+    box-shadow:
+      0 0 0.22rem var(--colour),
+      0 0 0.65rem var(--colour),
+      0 0 1rem color-mix(in srgb, var(--colour) 76%, transparent);
+  }
+
+  .living-flame {
+    width: 3px;
+    height: 9px;
+    box-shadow:
+      0 0 0.35rem rgba(255, 229, 159, 0.98),
+      0 0 1rem rgba(255, 156, 51, 0.82);
+  }
+
+  .candle-glow {
+    opacity: 0.68;
   }
 }
 

@@ -16,6 +16,9 @@ test('the main page presents a refined animated Christmas business dinner', () =
   assert.match(sceneSource, /className="guest-motion guest-right"/);
   assert.match(sceneSource, /className="toast-glint"/);
   assert.match(sceneSource, /className="living-flame"/);
+  assert.match(sceneSource, /className="tree-light"/);
+  assert.match(sceneSource, /const TREE_LIGHTS = \[/);
+  assert.match(sceneSource, /compactMotion/);
   assert.match(sceneSource, /onPointerMove/);
   assert.match(sceneSource, /className="candle-glow"/);
   assert.match(sceneSource, /Private Christmas dinner/);
@@ -23,6 +26,8 @@ test('the main page presents a refined animated Christmas business dinner', () =
   assert.match(sceneSource, /prefers-reduced-motion: no-preference/);
   assert.match(styles, /@keyframes window-snowfall/);
   assert.match(styles, /@keyframes flame-dance/);
+  assert.match(styles, /@keyframes tree-twinkle/);
+  assert.match(styles, /\.christmas-tree-lights/);
   assert.match(styles, /mask-image:\s*radial-gradient/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });

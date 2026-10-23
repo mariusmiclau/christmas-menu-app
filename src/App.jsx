@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getAdminSession, loginAsAdmin, logoutAdmin } from './adminAuth';
 import FestiveScene from './FestiveScene';
+import { saveOrder } from './ordersApi';
 import MenuManager from './MenuManager';
 import {
   DEFAULT_MENU,
@@ -26,7 +27,6 @@ import {
 const SHEET_ID = '1tNpDNx3LRTXE6nWUIaX1FZ1p8hcLJYodAf9zCSxQtMw';
 const API_KEY = 'AIzaSyBAZs3SukTI79zz4L403XT6aMgyor0pOUw';
 const SHEET_NAME = 'Orders';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-LKCNLy4V590ESImLF0PQ5T0UF7onFsh1kdjHuZTKjf129hjE76LhnYVqNo1KVBKySg/exec';
 const SHARED_MENU = getSharedMenu();
 
 function emptyOrder() {
@@ -484,18 +484,12 @@ export default function ChristmasMenuSelector() {
         activeMenu.id,
         activeMenu.title,
       ];
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheetId: SHEET_ID, sheetName: SHEET_NAME, values: [rowData] }),
-      });
-      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      await saveOrder(rowData);
       if (!clientMode) await loadOrdersFromSheet(true);
       return true;
     } catch (error) {
       console.error('Error saving order:', error);
-      setMessage('Your order could not be saved. Please try again.');
+      setMessage(error.message || 'Your order was not confirmed. Please contact the organiser before submitting again.');
       return false;
     } finally {
       setLoading(false);

@@ -41,7 +41,7 @@ Redeploy after adding or changing the variables. `npm run dev` grants local admi
 
 ## Orders
 
-Orders continue to use the configured Google Sheet and Apps Script in `src/App.jsx`. New rows contain:
+Orders are read from the configured Google Sheet in `src/App.jsx`. Submissions go through `api/orders.js`, which checks the Apps Script JSON response before confirming a save. A failed request or an unconfirmed response never displays success. New rows contain:
 
 1. Guest name
 2. Course count
@@ -54,6 +54,8 @@ Orders continue to use the configured Google Sheet and Apps Script in `src/App.j
 9. Menu title
 
 Add `Menu ID` and `Menu Title` as the final two headers in the `Orders` sheet. Older seven-column orders are treated as orders for the original Christmas menu.
+
+If the Google Apps Script deployment URL changes, set `ORDERS_SCRIPT_URL` in Vercel to the new `/exec` URL and redeploy. The script must accept the existing `sheetId`, `sheetName`, and `values` payload and return JSON with `status: 'success'` only after appending the row. Local submission testing requires a runtime that serves the Vercel API routes; the plain Vite dev server only serves the frontend. Do not retry timed-out submissions automatically: check the sheet first because the append may already have completed.
 
 ## Checks
 

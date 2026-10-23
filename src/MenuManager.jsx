@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Copy,
@@ -56,8 +56,10 @@ async function copyText(value) {
 }
 
 export default function MenuManager({ menus, activeMenuId, onActivate, onSave, onDelete }) {
+  const editorRef = useRef(null);
   const [draft, setDraft] = useState(() => menuToDraft(null));
   const [editing, setEditing] = useState(false);
+  const [editorFocusRequest, setEditorFocusRequest] = useState(0);
   const [rawText, setRawText] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const [importing, setImporting] = useState(false);
@@ -68,7 +70,21 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
 
+  useEffect(() => {
+    if (!editing || !editorFocusRequest) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      editorRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editing, editorFocusRequest]);
+
   const updateDraft = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
+
+  const openEditor = () => {
+    setEditing(true);
+    setEditorFocusRequest((request) => request + 1);
+  };
 
   const beginNew = () => {
     setDraft(menuToDraft(null));
@@ -76,7 +92,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     setPreviewUrl('');
     setImportMessage('');
     setNotice('');
-    setEditing(true);
+    openEditor();
   };
 
   const beginEdit = (menu) => {
@@ -85,7 +101,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     setPreviewUrl('');
     setImportMessage('');
     setNotice('');
-    setEditing(true);
+    openEditor();
   };
 
   const importParsedText = (text) => {
@@ -170,7 +186,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     setPreviewUrl('');
     setImportMessage('');
     setNotice('Edit the copy, then save it as a new client version.');
-    setEditing(true);
+    openEditor();
   };
 
   return (
@@ -226,7 +242,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
       </section>
 
       {editing && (
-        <section className="bg-white rounded-2xl shadow-2xl border border-white/70 overflow-hidden">
+        <section ref={editorRef} className="scroll-mt-4 bg-white rounded-2xl shadow-2xl border border-white/70 overflow-hidden">
           <div className="p-6 md:p-8 bg-slate-950 text-white flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-300 mb-1">{draft.id ? 'Edit version' : 'New version'}</p>

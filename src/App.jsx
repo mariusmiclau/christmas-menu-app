@@ -50,6 +50,27 @@ function getMenuItem(menu, category, id) {
   return menu?.[category]?.find((item) => item.id === id);
 }
 
+function FestiveBackdrop() {
+  const snowSymbols = ['❄', '❅', '✦'];
+
+  return (
+    <>
+      <div className="festive-background" aria-hidden="true" />
+      <div className="snowfield" aria-hidden="true">
+        {Array.from({ length: 24 }, (_, index) => (
+          <span key={index} style={{ '--i': index }}>{snowSymbols[index % snowSymbols.length]}</span>
+        ))}
+      </div>
+      <div className="festive-characters" aria-hidden="true">
+        <span className="festive-character festive-snowman festive-snowman-left">⛄</span>
+        <span className="festive-character festive-snowman festive-snowman-right">☃️</span>
+        <span className="festive-character festive-santa">🎅</span>
+        <span className="festive-character festive-reindeer">🦌</span>
+      </div>
+    </>
+  );
+}
+
 function MenuSection({ title, subtitle, items, selectedId, onSelect, disabledItem, accent = 'red', loading, children }) {
   if (!items.length) return null;
   const selectedClasses = accent === 'green'
@@ -576,10 +597,7 @@ export default function ChristmasMenuSelector() {
 
   return (
     <main className="min-h-screen relative overflow-hidden bg-slate-950">
-      <div className="festive-background" aria-hidden="true" />
-      <div className="snowfield" aria-hidden="true">
-        {Array.from({ length: 18 }, (_, index) => <span key={index} style={{ '--i': index }}>✦</span>)}
-      </div>
+      <FestiveBackdrop />
 
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
         <header className="text-center mb-8">

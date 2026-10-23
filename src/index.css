@@ -46,6 +46,7 @@
 .festive-background {
   position: fixed;
   inset: 0;
+  z-index: 0;
   background:
     radial-gradient(circle at 12% 14%, rgba(251, 191, 36, 0.22), transparent 22rem),
     radial-gradient(circle at 90% 18%, rgba(16, 185, 129, 0.24), transparent 28rem),
@@ -66,9 +67,10 @@
 .snowfield {
   position: fixed;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
   overflow: hidden;
-  opacity: 0.55;
+  opacity: 0.68;
 }
 
 .snowfield span {
@@ -78,14 +80,113 @@
   top: -3rem;
   color: white;
   font-size: calc(0.65rem + ((var(--i) % 4) * 0.2rem));
-  animation: snowfall calc(11s + ((var(--i) % 6) * 2s)) linear infinite;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  animation: snowfall calc(10s + ((var(--i) % 7) * 1.7s)) linear infinite;
   animation-delay: calc((var(--i) % 9) * -1.8s);
+}
+
+.festive-characters {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  user-select: none;
+}
+
+.festive-character {
+  position: absolute;
+  display: block;
+  line-height: 1;
+  filter: drop-shadow(0 12px 16px rgba(2, 6, 23, 0.38));
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+.festive-snowman {
+  font-size: clamp(3rem, 5.5vw, 5.5rem);
+  animation: festive-float 4.6s ease-in-out infinite;
+}
+
+.festive-snowman-left {
+  top: 5.5rem;
+  left: clamp(0.75rem, 3vw, 3.5rem);
+}
+
+.festive-snowman-right {
+  top: 8.5rem;
+  right: clamp(0.75rem, 3.5vw, 4rem);
+  animation-delay: -1.7s;
+}
+
+.festive-santa {
+  bottom: clamp(1.5rem, 5vh, 4rem);
+  left: clamp(1rem, 4vw, 5rem);
+  font-size: clamp(3.75rem, 6.5vw, 6.5rem);
+  animation: santa-sway 4.2s ease-in-out infinite;
+}
+
+.festive-reindeer {
+  right: clamp(1rem, 4vw, 5rem);
+  bottom: clamp(3.5rem, 10vh, 7rem);
+  font-size: clamp(3.5rem, 6vw, 6rem);
+  animation: reindeer-prance 3.6s ease-in-out infinite;
 }
 
 @keyframes snowfall {
   0% { transform: translate3d(0, -5vh, 0) rotate(0deg); }
   50% { transform: translate3d(2.5rem, 52vh, 0) rotate(180deg); }
   100% { transform: translate3d(-1.5rem, 108vh, 0) rotate(360deg); }
+}
+
+@keyframes festive-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-2deg); }
+  50% { transform: translate3d(0, -1rem, 0) rotate(3deg); }
+}
+
+@keyframes santa-sway {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
+  45% { transform: translate3d(0.65rem, -0.9rem, 0) rotate(5deg); }
+  70% { transform: translate3d(-0.25rem, -0.35rem, 0) rotate(-1deg); }
+}
+
+@keyframes reindeer-prance {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(2deg) scaleX(1); }
+  35% { transform: translate3d(-0.8rem, -1.1rem, 0) rotate(-4deg) scaleX(1.03); }
+  65% { transform: translate3d(0.45rem, -0.4rem, 0) rotate(4deg) scaleX(0.98); }
+}
+
+@media (max-width: 767px) {
+  .festive-character {
+    opacity: 0.7;
+  }
+
+  .festive-snowman {
+    font-size: 2.75rem;
+  }
+
+  .festive-snowman-left {
+    top: 1.25rem;
+    left: 0.3rem;
+  }
+
+  .festive-snowman-right {
+    top: 5.5rem;
+    right: 0.3rem;
+  }
+
+  .festive-santa,
+  .festive-reindeer {
+    font-size: 3.25rem;
+  }
+
+  .festive-santa {
+    left: 0.25rem;
+  }
+
+  .festive-reindeer {
+    right: 0.25rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

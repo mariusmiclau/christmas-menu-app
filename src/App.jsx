@@ -55,7 +55,7 @@ function FestiveBackdrop() {
     <>
       <div className="festive-background" aria-hidden="true" />
       <div className="snowfield" aria-hidden="true">
-        {Array.from({ length: 36 }, (_, index) => <span key={index} style={{ '--i': index }} />)}
+        {Array.from({ length: 22 }, (_, index) => <span key={index} style={{ '--i': index }} />)}
       </div>
     </>
   );

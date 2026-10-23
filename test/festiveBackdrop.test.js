@@ -6,14 +6,15 @@ const appSource = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8
 const sceneSource = readFileSync(new URL('../src/FestiveScene.jsx', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 
-test('the main page keeps its animated cinematic Christmas scene', () => {
+test('the main page presents a refined animated Christmas business dinner', () => {
   assert.match(appSource, /<FestiveScene/);
   assert.match(appSource, /className="snowfield"/);
-  assert.match(sceneSource, /className="sleigh-flight"/);
-  assert.match(sceneSource, /className="scene-reindeer"/);
-  assert.match(sceneSource, /className="scene-snowman"/);
-  assert.match(sceneSource, /ScrollTrigger/);
+  assert.match(sceneSource, /business-christmas-dinner\.webp/);
+  assert.match(sceneSource, /className="business-christmas-image"/);
+  assert.match(sceneSource, /className="candle-glow"/);
+  assert.match(sceneSource, /Private Christmas dinner/);
+  assert.doesNotMatch(sceneSource, /sleigh|reindeer|snowman/i);
   assert.match(sceneSource, /prefers-reduced-motion: no-preference/);
-  assert.match(styles, /@keyframes marquee-drift/);
+  assert.match(styles, /@keyframes window-snowfall/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });

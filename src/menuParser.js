@@ -16,12 +16,88 @@ const HEADING_WORDS = {
 const SKIP_LINE = /^(menu|christmas menu|festive menu|allergens?|dietary information|please ask|prices? include|available from|terms|v\s*=|vg\s*=|gf\s*=|celebrating our|in traditional|pre-?order payment)/i;
 const TAG_PATTERN = 'vgo|gfo|voa|vegan|vegetarian|vg|gf|v';
 
+function splitCollapsedMenuLine(value) {
+  const text = String(value || '').trim();
+  if (text.length < 100) return [text];
+
+  const tokens = [...text.matchAll(/\S+/g)].map((match) => ({
+    raw: match[0],
+    word: match[0].replace(/^[^\p{L}\p{N}&]+|[^\p{L}\p{N}&]+$/gu, ''),
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+  const isTitleWord = (word) => /^(?:\d+(?:oz|g|kg)?|\p{Lu}[\p{L}\p{M}'’/-]*)$/u.test(word);
+  const isConnector = (word) => /^(?:&|and|of)$/i.test(word);
+  const titles = [];
+
+  for (let index = 0; index < tokens.length;) {
+    if (!isTitleWord(tokens[index].word)) {
+      index += 1;
+      continue;
+    }
+
+    let cursor = index;
+    let titleWordCount = 0;
+    while (cursor < tokens.length) {
+      if (isTitleWord(tokens[cursor].word)) {
+        titleWordCount += 1;
+        cursor += 1;
+        continue;
+      }
+      if (isConnector(tokens[cursor].word) && isTitleWord(tokens[cursor + 1]?.word)) {
+        cursor += 1;
+        continue;
+      }
+      break;
+    }
+
+    const sequenceEnd = cursor;
+    let titleEnd = cursor;
+    const followingWord = tokens[cursor]?.word || '';
+    if (titleWordCount >= 3 && /^[\p{Ll}]/u.test(followingWord)) titleEnd -= 1;
+
+    if (titleWordCount - (titleEnd < cursor ? 1 : 0) >= 2) {
+      titles.push({
+        start: tokens[index].start,
+        end: tokens[titleEnd - 1].end,
+        title: text.slice(tokens[index].start, tokens[titleEnd - 1].end).trim(),
+      });
+      index = sequenceEnd;
+    } else {
+      index += 1;
+    }
+  }
+
+  if (titles.length < 3 || titles[0].start > 8) return [text];
+
+  const items = titles.map((title, index) => {
+    const nextStart = titles[index + 1]?.start ?? text.length;
+    const description = text.slice(title.end, nextStart)
+      .replace(/^[\s|•·—–\-¥§]+|[\s|•·—–\-¥§]+$/g, '')
+      .trim();
+    return { title: title.title, description };
+  });
+
+  const deduplicated = [];
+  items.forEach((item) => {
+    const previous = deduplicated.at(-1);
+    if (previous?.title.toLowerCase() === item.title.toLowerCase()) {
+      if (item.description) previous.description = [previous.description, item.description].filter(Boolean).join(' ');
+      return;
+    }
+    deduplicated.push(item);
+  });
+
+  return deduplicated.map(({ title, description }) => (description ? `${title} — ${description}` : title));
+}
+
 function splitVisualSegments(value) {
   return String(value || '')
     .replace(/\r/g, '')
     .split(/\n+|\t+| {3,}/)
     .map((segment) => segment.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap(splitCollapsedMenuLine);
 }
 
 export function cleanLine(line) {

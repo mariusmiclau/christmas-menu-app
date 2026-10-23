@@ -1,4 +1,33 @@
 const STORAGE_KEY = 'fv-menu-versions-v1';
+const IMPORT_FOOTER_FRAGMENT = /(?:connections?\s+and\s+achievements|bring\s+the\s+\d{4}\s+network|network(?:ing)?\s+calendar|calendar\s+to\s+a\s+close)/i;
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function sanitiseItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item?.name && !IMPORT_FOOTER_FRAGMENT.test(item.name))
+    .map((item) => {
+      const cleanItem = { ...item };
+      const description = String(item.description || '')
+        .replace(new RegExp(`^${escapeRegExp(item.name.trim())}(?:\\s+|\\s*[—–:-]\\s*)`, 'i'), '')
+        .trim();
+      delete cleanItem.description;
+      return description ? { ...cleanItem, description } : cleanItem;
+    });
+}
+
+export function sanitiseMenu(menu) {
+  if (!menu || typeof menu !== 'object') return menu;
+  return {
+    ...menu,
+    starters: sanitiseItems(menu.starters),
+    mains: sanitiseItems(menu.mains),
+    desserts: sanitiseItems(menu.desserts),
+  };
+}
 
 export const DEFAULT_MENU = {
   id: 'fv-christmas-2025',
@@ -32,7 +61,7 @@ export const DEFAULT_MENU = {
 export function readStoredMenus() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(stored) && stored.length) return stored;
+    if (Array.isArray(stored) && stored.length) return stored.map(sanitiseMenu);
   } catch (error) {
     console.warn('Could not read saved menu versions', error);
   }
@@ -40,7 +69,7 @@ export function readStoredMenus() {
 }
 
 export function storeMenus(menus) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(menus));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(menus.map(sanitiseMenu)));
 }
 
 export function createMenuId(title) {
@@ -71,7 +100,7 @@ export function decodeMenu(encoded) {
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     const menu = JSON.parse(new TextDecoder().decode(bytes));
     if (!menu?.id || !menu?.title || !Array.isArray(menu?.mains)) return null;
-    return menu;
+    return sanitiseMenu(menu);
   } catch (error) {
     console.warn('Could not open shared menu', error);
     return null;

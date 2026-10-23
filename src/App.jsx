@@ -14,6 +14,8 @@ import {
 import { getAdminSession, loginAsAdmin, logoutAdmin } from './adminAuth';
 import FestiveScene from './FestiveScene';
 import { saveOrder } from './ordersApi';
+import OrderConfirmation from './OrderConfirmation';
+import { createOrderConfirmation } from './orderReceipt';
 import MenuManager from './MenuManager';
 import {
   DEFAULT_MENU,
@@ -362,6 +364,7 @@ export default function ChristmasMenuSelector() {
   const requestedMenuId = new URLSearchParams(window.location.search).get('menu');
   const [activeMenuId, setActiveMenuId] = useState(() => SHARED_MENU?.id || requestedMenuId || menus[0].id);
   const [order, setOrder] = useState(emptyOrder);
+  const [confirmation, setConfirmation] = useState(null);
   const [guests, setGuests] = useState([]);
   const [viewMode, setViewMode] = useState('form');
   const [loading, setLoading] = useState(false);
@@ -450,6 +453,7 @@ export default function ChristmasMenuSelector() {
 
   const activateMenu = (menuId) => {
     setActiveMenuId(menuId);
+    setConfirmation(null);
     setOrder(emptyOrder());
     setMessage('');
     setViewMode('form');
@@ -517,12 +521,21 @@ export default function ChristmasMenuSelector() {
     const orderDate = new Date().toLocaleString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });
-    const saved = await saveOrderToSheet({ ...order, name: order.name.trim(), orderDate });
+    const submittedOrder = { ...order, name: order.name.trim(), orderDate };
+    const receipt = createOrderConfirmation(activeMenu, submittedOrder);
+    const saved = await saveOrderToSheet(submittedOrder);
     if (saved) {
+      setConfirmation(receipt);
       setOrder(emptyOrder());
-      setMessage('Your order was submitted successfully.');
-      setViewMode(clientMode ? 'form' : 'view');
+      setMessage('');
+      setViewMode('confirmation');
     }
+  };
+
+  const startNewOrder = () => {
+    setConfirmation(null);
+    setMessage('');
+    setViewMode('form');
   };
 
   const exportOrders = () => {
@@ -596,7 +609,7 @@ export default function ChristmasMenuSelector() {
         )}
 
         <nav className="flex flex-wrap justify-center gap-2 mb-7" aria-label="Main navigation">
-          <button type="button" onClick={() => setViewMode('form')} className={`nav-button ${viewMode === 'form' ? 'nav-button-active' : ''}`}><ChefHat size={18} /> Place order</button>
+          <button type="button" onClick={startNewOrder} className={`nav-button ${viewMode === 'form' ? 'nav-button-active' : ''}`}><ChefHat size={18} /> Place order</button>
           {!clientMode && isAdmin && <button type="button" onClick={() => { setViewMode('view'); loadOrdersFromSheet(); }} className={`nav-button ${viewMode === 'view' ? 'nav-button-active' : ''}`}><Users size={18} /> Orders <span className="nav-count">{activeGuests.length}</span></button>}
           {!clientMode && isAdmin && <button type="button" onClick={() => setViewMode('manage')} className={`nav-button ${viewMode === 'manage' ? 'nav-button-active' : ''}`}><Library size={18} /> Menus</button>}
           {!clientMode && !authChecking && !isAdmin && <button type="button" onClick={() => setViewMode('admin')} className={`nav-button ${viewMode === 'admin' ? 'nav-button-active' : ''}`}><LogIn size={18} /> Admin</button>}
@@ -607,6 +620,7 @@ export default function ChristmasMenuSelector() {
         {message && <div className={`max-w-5xl mx-auto mb-5 px-4 py-3 rounded-xl border font-semibold ${message.includes('successfully') ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-950'}`}>{message}</div>}
 
         {viewMode === 'form' && <OrderForm menu={activeMenu} order={order} setOrder={setOrder} loading={loading} onSubmit={submitOrder} clientMode={clientMode} />}
+        {viewMode === 'confirmation' && confirmation && <OrderConfirmation confirmation={confirmation} onNewOrder={startNewOrder} />}
         {viewMode === 'admin' && !clientMode && !isAdmin && <AdminLogin onLogin={handleAdminLogin} onCancel={() => setViewMode('form')} />}
         {viewMode === 'view' && isAdmin && <OrdersView menu={activeMenu} guests={activeGuests} loading={loading} lastUpdate={lastUpdate} onRefresh={() => loadOrdersFromSheet()} onExport={exportOrders} />}
         {viewMode === 'manage' && !clientMode && isAdmin && <MenuManager menus={menus} activeMenuId={activeMenu.id} onActivate={activateMenu} onSave={saveMenu} onDelete={deleteMenu} />}

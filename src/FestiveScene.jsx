@@ -43,64 +43,17 @@ const TREE_LIGHTS = [
 
 export default function FestiveScene({ title, eventDate, clientMode }) {
   const sceneRef = useRef(null);
-  const photoPlaneRef = useRef(null);
 
   useGSAP(() => {
     const media = gsap.matchMedia();
 
     media.add('(prefers-reduced-motion: no-preference)', () => {
-      const compactMotion = window.matchMedia('(max-width: 639px)').matches;
-
       gsap.timeline({ defaults: { ease: 'power3.out' } })
         .from('.hero-kicker', { y: 14, opacity: 0, duration: 0.55 })
         .from('.hero-title', { y: 28, opacity: 0, duration: 0.85 }, '-=0.25')
         .from('.hero-date, .hero-client-note', { y: 14, opacity: 0, duration: 0.55, stagger: 0.1 }, '-=0.45')
         .from('.hero-rule', { scaleX: 0, duration: 0.75 }, '-=0.35')
-        .from('.business-event-frame', { x: 34, scale: 0.97, opacity: 0, duration: 1.05 }, '-=0.8');
-
-      gsap.to('.photo-breathe', {
-        scale: 1.045,
-        duration: 13,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-      });
-
-      gsap.to('.guest-left', {
-        xPercent: compactMotion ? 1.15 : 0.5,
-        yPercent: compactMotion ? -0.35 : 0,
-        rotation: compactMotion ? 0.55 : 0.28,
-        duration: compactMotion ? 2.65 : 3.2,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-      });
-
-      gsap.to('.guest-centre', {
-        xPercent: compactMotion ? -0.85 : -0.32,
-        yPercent: compactMotion ? -1.05 : -0.5,
-        rotation: compactMotion ? -0.42 : -0.18,
-        duration: compactMotion ? 2.3 : 2.75,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-      });
-
-      gsap.to('.guest-right', {
-        xPercent: compactMotion ? -1.05 : -0.42,
-        yPercent: compactMotion ? 0.7 : 0.32,
-        rotation: compactMotion ? 0.48 : 0.22,
-        duration: compactMotion ? 2.9 : 3.6,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-      });
-
-      gsap.timeline({ repeat: -1, repeatDelay: 2.8 })
-        .fromTo('.toast-glint',
-          { scale: 0.35, opacity: 0, rotation: -18 },
-          { scale: 1, opacity: 0.9, rotation: 6, duration: 0.45, ease: 'back.out(2)' })
-        .to('.toast-glint', { scale: 1.5, opacity: 0, duration: 0.75, ease: 'power2.out' });
+        .from('.business-event-frame', { opacity: 0, duration: 1.05 }, '-=0.8');
 
       gsap.to('.candle-glow', {
         opacity: 0.78,
@@ -111,39 +64,10 @@ export default function FestiveScene({ title, eventDate, clientMode }) {
         ease: 'sine.inOut',
       });
 
-      gsap.fromTo('.photo-sheen',
-        { xPercent: -125, opacity: 0 },
-        { xPercent: 175, opacity: 0.38, duration: 7.5, repeat: -1, repeatDelay: 5.5, ease: 'power1.inOut' });
     });
 
     return () => media.revert();
   }, { scope: sceneRef });
-
-  const handlePointerMove = (event) => {
-    if ((event.pointerType && event.pointerType !== 'mouse')
-      || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const horizontal = ((event.clientX - bounds.left) / bounds.width) - 0.5;
-    const vertical = ((event.clientY - bounds.top) / bounds.height) - 0.5;
-    gsap.to(photoPlaneRef.current, {
-      x: horizontal * 8,
-      y: vertical * 5,
-      duration: 0.7,
-      overwrite: 'auto',
-      ease: 'power2.out',
-    });
-  };
-
-  const handlePointerLeave = () => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    gsap.to(photoPlaneRef.current, {
-      x: 0,
-      y: 0,
-      duration: 0.9,
-      overwrite: 'auto',
-      ease: 'power3.out',
-    });
-  };
 
   return (
     <header ref={sceneRef} className="hero-stage">
@@ -160,13 +84,7 @@ export default function FestiveScene({ title, eventDate, clientMode }) {
       </div>
 
       <figure className="cinema-shell" data-testid="business-event-cinema">
-        <div
-          className="business-event-frame"
-          onPointerMove={handlePointerMove}
-          onPointerLeave={handlePointerLeave}
-        >
-          <div ref={photoPlaneRef} className="photo-depth">
-            <div className="photo-breathe">
+        <div className="business-event-frame">
               <img
                 className="business-christmas-image"
                 src={dinnerImage}
@@ -177,17 +95,6 @@ export default function FestiveScene({ title, eventDate, clientMode }) {
                 decoding="async"
                 fetchPriority="high"
               />
-              <div className="guest-motion guest-left" aria-hidden="true">
-                <img src={dinnerImage} alt="" />
-              </div>
-              <div className="guest-motion guest-centre" aria-hidden="true">
-                <img src={dinnerImage} alt="" />
-              </div>
-              <div className="guest-motion guest-right" aria-hidden="true">
-                <img src={dinnerImage} alt="" />
-              </div>
-            </div>
-          </div>
           <div className="business-image-shade" aria-hidden="true" />
           <div className="candle-glow" aria-hidden="true" />
           <div className="christmas-tree-lights" aria-hidden="true">
@@ -215,8 +122,6 @@ export default function FestiveScene({ title, eventDate, clientMode }) {
               />
             ))}
           </div>
-          <div className="toast-glint" aria-hidden="true"><span /></div>
-          <div className="photo-sheen" aria-hidden="true" />
           <div className="window-snow" aria-hidden="true">
             {WINDOW_SNOW.map((index) => <span key={index} style={{ '--i': index }} />)}
           </div>

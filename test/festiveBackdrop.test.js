@@ -11,15 +11,10 @@ test('the main page presents a refined animated Christmas business dinner', () =
   assert.match(appSource, /className="snowfield"/);
   assert.match(sceneSource, /business-christmas-dinner\.webp/);
   assert.match(sceneSource, /className="business-christmas-image"/);
-  assert.match(sceneSource, /className="guest-motion guest-left"/);
-  assert.match(sceneSource, /className="guest-motion guest-centre"/);
-  assert.match(sceneSource, /className="guest-motion guest-right"/);
-  assert.match(sceneSource, /className="toast-glint"/);
+  assert.doesNotMatch(sceneSource, /guest-motion|photo-breathe|onPointerMove|toast-glint|photo-sheen/);
   assert.match(sceneSource, /className="living-flame"/);
   assert.match(sceneSource, /className="tree-light"/);
   assert.match(sceneSource, /const TREE_LIGHTS = \[/);
-  assert.match(sceneSource, /compactMotion/);
-  assert.match(sceneSource, /onPointerMove/);
   assert.match(sceneSource, /className="candle-glow"/);
   assert.match(sceneSource, /Private Christmas dinner/);
   assert.doesNotMatch(sceneSource, /sleigh|reindeer|snowman/i);

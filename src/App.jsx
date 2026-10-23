@@ -3,7 +3,6 @@ import {
   Calendar,
   ChefHat,
   Download,
-  ExternalLink,
   LogIn,
   LogOut,
   Library,
@@ -13,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { getAdminSession, loginAsAdmin, logoutAdmin } from './adminAuth';
+import FestiveScene from './FestiveScene';
 import MenuManager from './MenuManager';
 import {
   DEFAULT_MENU,
@@ -51,21 +51,11 @@ function getMenuItem(menu, category, id) {
 }
 
 function FestiveBackdrop() {
-  const snowSymbols = ['❄', '❅', '✦'];
-
   return (
     <>
       <div className="festive-background" aria-hidden="true" />
       <div className="snowfield" aria-hidden="true">
-        {Array.from({ length: 24 }, (_, index) => (
-          <span key={index} style={{ '--i': index }}>{snowSymbols[index % snowSymbols.length]}</span>
-        ))}
-      </div>
-      <div className="festive-characters" aria-hidden="true">
-        <span className="festive-character festive-snowman festive-snowman-left">⛄</span>
-        <span className="festive-character festive-snowman festive-snowman-right">☃️</span>
-        <span className="festive-character festive-santa">🎅</span>
-        <span className="festive-character festive-reindeer">🦌</span>
+        {Array.from({ length: 36 }, (_, index) => <span key={index} style={{ '--i': index }} />)}
       </div>
     </>
   );
@@ -132,7 +122,7 @@ function OrderForm({ menu, order, setOrder, loading, onSubmit, clientMode }) {
   };
 
   return (
-    <section className="max-w-5xl mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/70 overflow-hidden">
+    <section className="order-stage max-w-5xl mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/70 overflow-hidden">
       <div className="bg-slate-950 text-white px-6 py-7 md:px-9 flex flex-col md:flex-row md:items-end justify-between gap-3">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-300 mb-2">Your selection</p>
@@ -159,7 +149,7 @@ function OrderForm({ menu, order, setOrder, loading, onSubmit, clientMode }) {
 
         <fieldset>
           <legend className="text-lg font-extrabold mb-3 text-slate-800">Choose your package *</legend>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-flow-dense sm:grid-cols-2 gap-4">
             {[2, 3].map((courseCount) => {
               const option = menu.courseOptions?.[courseCount];
               if (!option) return null;
@@ -596,16 +586,11 @@ export default function ChristmasMenuSelector() {
   };
 
   return (
-    <main className="min-h-screen relative overflow-hidden bg-slate-950">
+    <main className="min-h-screen relative overflow-x-hidden w-full max-w-full bg-slate-950">
       <FestiveBackdrop />
 
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
-        <header className="text-center mb-8">
-          <p className="text-xs md:text-sm font-bold uppercase tracking-[0.35em] text-amber-300 mb-3">Festive dining</p>
-          <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-lg">{activeMenu.title}</h1>
-          <p className="text-lg md:text-xl text-red-100 mt-3">{formatEventDate(activeMenu.eventDate)}</p>
-          {clientMode && <p className="mt-4 inline-flex items-center gap-2 text-sm text-white/75"><ExternalLink size={15} /> You are viewing a shared client menu</p>}
-        </header>
+        <FestiveScene title={activeMenu.title} eventDate={formatEventDate(activeMenu.eventDate)} clientMode={clientMode} />
 
         {!clientMode && isAdmin && menus.length > 1 && (
           <div className="max-w-md mx-auto mb-5">

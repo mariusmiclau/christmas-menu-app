@@ -21,6 +21,8 @@ npm run dev
 
 The client link contains the structured menu configuration. Saved menu versions also live in the `Menus` tab of the existing Google Sheet, so they are available across browsers and admin devices. The Published badge identifies the menu shown by the main website link. Historical menus remain available for their existing orders.
 
+The admin can **Delete** an unneeded menu version from the active list and restore it from **Deleted menus**. This is a recoverable deletion: the menu record and past orders stay in the sheet. The published menu cannot be deleted until another menu is published. A previously copied client link contains its own menu data and may still open a deleted version.
+
 The main website URL opens the PPN Christmas menu for 9 December 2026 until a different menu is published. Explicit client links still open their own menu. The original 2025 menu remains available in Admin for historical orders; rows without a menu ID always belong to that original menu.
 
 ## One-time shared-menu setup

@@ -482,6 +482,27 @@ export default function ChristmasMenuSelector() {
     setMenuSyncStatus('ready');
   };
 
+  const deleteMenu = async (menuId) => {
+    if (menuId === publishedMenuId) throw new Error('Publish a different menu before deleting this one.');
+    const menu = menus.find((item) => item.id === menuId);
+    if (!menu) throw new Error('Menu version not found.');
+    const deletedMenu = { ...menu, deleted: true };
+    await writeSharedMenu('saveMenu', deletedMenu);
+    setMenus((current) => current.map((item) => item.id === menuId ? deletedMenu : item));
+    if (activeMenuId === menuId) {
+      setActiveMenuId(publishedMenuId);
+      setOrder(emptyOrder());
+    }
+  };
+
+  const restoreMenu = async (menuId) => {
+    const menu = menus.find((item) => item.id === menuId);
+    if (!menu) throw new Error('Menu version not found.');
+    const restoredMenu = { ...menu, deleted: false };
+    await writeSharedMenu('saveMenu', restoredMenu);
+    setMenus((current) => current.map((item) => item.id === menuId ? restoredMenu : item));
+  };
+
   const publishMenu = async (menuId) => {
     const menu = menus.find((item) => item.id === menuId);
     if (!menu) throw new Error('Menu version not found.');
@@ -616,11 +637,11 @@ export default function ChristmasMenuSelector() {
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
         <FestiveScene title={activeMenu.title} eventDate={formatEventDate(activeMenu.eventDate)} clientMode={clientMode} />
 
-        {!clientMode && isAdmin && menus.length > 1 && (
+        {!clientMode && isAdmin && menus.filter((menu) => !menu.deleted).length > 1 && (
           <div className="max-w-md mx-auto mb-5">
             <label className="block text-xs uppercase tracking-wider font-bold text-white/70 mb-2 text-center">Viewing menu version</label>
             <select value={activeMenu.id} onChange={(event) => activateMenu(event.target.value)} className="field font-bold text-center">
-              {menus.map((menu) => <option key={menu.id} value={menu.id}>{menu.title}</option>)}
+              {menus.filter((menu) => !menu.deleted).map((menu) => <option key={menu.id} value={menu.id}>{menu.title}</option>)}
             </select>
           </div>
         )}
@@ -640,7 +661,7 @@ export default function ChristmasMenuSelector() {
         {viewMode === 'confirmation' && confirmation && <OrderConfirmation confirmation={confirmation} onNewOrder={startNewOrder} />}
         {viewMode === 'admin' && !clientMode && !isAdmin && <AdminLogin onLogin={handleAdminLogin} onCancel={() => setViewMode('form')} />}
         {viewMode === 'view' && isAdmin && <OrdersView menu={activeMenu} guests={activeGuests} loading={loading} lastUpdate={lastUpdate} onRefresh={() => loadOrdersFromSheet()} onExport={exportOrders} />}
-        {viewMode === 'manage' && !clientMode && isAdmin && <MenuManager menus={menus} activeMenuId={activeMenu.id} publishedMenuId={publishedMenuId} menuSyncStatus={menuSyncStatus} onPublish={publishMenu} onSave={saveMenu} />}
+        {viewMode === 'manage' && !clientMode && isAdmin && <MenuManager menus={menus} activeMenuId={activeMenu.id} publishedMenuId={publishedMenuId} menuSyncStatus={menuSyncStatus} onPublish={publishMenu} onSave={saveMenu} onDelete={deleteMenu} onRestore={restoreMenu} />}
       </div>
     </main>
   );

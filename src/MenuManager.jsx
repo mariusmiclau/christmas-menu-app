@@ -8,7 +8,9 @@ import {
   Plus,
   Save,
   Sparkles,
+  Trash2,
   Upload,
+  Undo2,
   X,
 } from 'lucide-react';
 import { createMenuId, formatEventDate, getClientLink } from './menuData';
@@ -54,7 +56,7 @@ async function copyText(value) {
   textArea.remove();
 }
 
-export default function MenuManager({ menus, activeMenuId, publishedMenuId, menuSyncStatus, onPublish, onSave }) {
+export default function MenuManager({ menus, activeMenuId, publishedMenuId, menuSyncStatus, onPublish, onSave, onDelete, onRestore }) {
   const editorRef = useRef(null);
   const [draft, setDraft] = useState(() => menuToDraft(null));
   const [editing, setEditing] = useState(false);
@@ -66,6 +68,9 @@ export default function MenuManager({ menus, activeMenuId, publishedMenuId, menu
   const [notice, setNotice] = useState('');
   const [noticeError, setNoticeError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const visibleMenus = menus.filter((menu) => !menu.deleted);
+  const deletedMenus = menus.filter((menu) => menu.deleted);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -204,6 +209,37 @@ export default function MenuManager({ menus, activeMenuId, publishedMenuId, menu
     }
   };
 
+  const deleteVersion = async (menu) => {
+    if (!window.confirm(`Delete “${menu.title}” from the menu list? Its past orders remain available, and you can restore it later. Previously shared links may still open it.`)) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      await onDelete(menu.id);
+      setNotice(`“${menu.title}” moved to Deleted menus.`);
+      setNoticeError(false);
+    } catch (error) {
+      setNotice(error.message || 'The menu could not be deleted.');
+      setNoticeError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restoreVersion = async (menu) => {
+    setBusy(true);
+    setNotice('');
+    try {
+      await onRestore(menu.id);
+      setNotice(`“${menu.title}” restored to the menu list.`);
+      setNoticeError(false);
+    } catch (error) {
+      setNotice(error.message || 'The menu could not be restored.');
+      setNoticeError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const copyLink = async (menu) => {
     await copyText(getClientLink(menu));
     setNotice(`Client link copied for “${menu.title}”.`);
@@ -246,7 +282,7 @@ export default function MenuManager({ menus, activeMenuId, publishedMenuId, menu
         {menuSyncStatus === 'unavailable' && <p role="alert" className="mx-6 md:mx-8 mt-5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-semibold">Shared menu storage is unavailable. Saving or publishing will show an error until the Google Apps Script setup is complete.</p>}
 
         <div className="p-6 md:p-8 grid md:grid-cols-2 gap-4">
-          {menus.map((menu) => (
+          {visibleMenus.map((menu) => (
             <article key={menu.id} className={`rounded-2xl border-2 p-5 transition-colors ${menu.id === activeMenuId ? 'border-emerald-600 bg-emerald-50/70' : 'border-slate-200 bg-white'}`}>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -266,10 +302,22 @@ export default function MenuManager({ menus, activeMenuId, publishedMenuId, menu
                 <a href={getClientLink(menu)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 flex items-center justify-center gap-1.5"><ExternalLink size={15} /> Preview</a>
                 <button type="button" onClick={() => beginEdit(menu)} className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 flex items-center justify-center gap-1.5"><Pencil size={15} /> Edit</button>
                 <button type="button" onClick={() => duplicateMenu(menu)} className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 flex items-center justify-center gap-1.5"><Copy size={15} /> Duplicate</button>
+                {menu.id !== publishedMenuId && <button type="button" disabled={busy} onClick={() => deleteVersion(menu)} className="px-3 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-bold hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1.5"><Trash2 size={15} /> Delete</button>}
               </div>
             </article>
           ))}
         </div>
+        {deletedMenus.length > 0 && (
+          <div className="px-6 pb-6 md:px-8 md:pb-8">
+            <button type="button" onClick={() => setShowDeleted((current) => !current)} aria-expanded={showDeleted} className="text-sm font-bold text-slate-600 hover:text-slate-900">{showDeleted ? 'Hide' : 'Show'} Deleted menus ({deletedMenus.length})</button>
+            {showDeleted && <div className="mt-3 grid md:grid-cols-2 gap-3">
+              {deletedMenus.map((menu) => <div key={menu.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div><p className="font-bold text-slate-800">{menu.title}</p><p className="text-xs text-slate-500">Past orders are preserved</p></div>
+                <button type="button" disabled={busy} onClick={() => restoreVersion(menu)} className="px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-slate-700 hover:bg-white disabled:opacity-50 flex items-center gap-1.5"><Undo2 size={15} /> Restore</button>
+              </div>)}
+            </div>}
+          </div>
+        )}
       </section>
 
       {editing && (

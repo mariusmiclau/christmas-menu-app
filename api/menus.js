@@ -6,6 +6,7 @@ const menuId = (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,79}
 
 function validMenu(menu) {
   if (!menu || !menuId(menu.id) || typeof menu.title !== 'string' || !menu.title.trim() || menu.title.length > 120) return false;
+  if (menu.deleted !== undefined && typeof menu.deleted !== 'boolean') return false;
   if (typeof menu.eventDate !== 'string' || menu.eventDate.length > 40) return false;
   if (![2, 3].every((count) => Number.isFinite(Number(menu.courseOptions?.[count]?.price)) && Number(menu.courseOptions[count].price) >= 0)) return false;
   return ['starters', 'mains', 'desserts'].every((category) => Array.isArray(menu[category])
@@ -47,7 +48,16 @@ export default async function handler(request, response) {
   if (!['saveMenu', 'publishMenu'].includes(action) || !validMenu(menu) || JSON.stringify(menu).length > 60000) {
     return sendJson(response, 400, { error: 'Please check the menu details before saving.' });
   }
+  if (action === 'publishMenu' && menu.deleted) {
+    return sendJson(response, 400, { error: 'Restore this menu before publishing it.' });
+  }
   try {
+    if (menu.deleted) {
+      const state = await fetchScript();
+      if (state.activeMenuId === menu.id) {
+        return sendJson(response, 409, { error: 'Publish a different menu before deleting this one.' });
+      }
+    }
     const result = await fetchScript({ action, sheetId: SHEET_ID, secret, menu });
     if (result.menuId !== menu.id || typeof result.activeMenuId !== 'string') throw new Error('Google did not confirm the menu update.');
     return sendJson(response, 200, { saved: true, activeMenuId: result.activeMenuId });

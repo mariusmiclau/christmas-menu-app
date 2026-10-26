@@ -73,3 +73,28 @@ test('menu writes require admin login and the server-side secret', async (t) => 
   assert.equal(malformed.statusCode, 400);
   assert.equal(writes, 2);
 });
+
+test('published menu cannot be deleted through a stale admin page', async (t) => {
+  const previous = {
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    ADMIN_SESSION_SECRET: process.env.ADMIN_SESSION_SECRET,
+    MENU_WRITE_SECRET: process.env.MENU_WRITE_SECRET,
+  };
+  t.after(() => Object.entries(previous).forEach(([key, value]) => {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  }));
+  process.env.ADMIN_PASSWORD = 'test-password-123456';
+  process.env.ADMIN_SESSION_SECRET = 'session-secret-of-at-least-32-characters';
+  process.env.MENU_WRITE_SECRET = 'menu-write-secret-of-at-least-32-characters';
+  const token = createAdminToken(process.env.ADMIN_SESSION_SECRET);
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    calls += 1;
+    assert.equal(options?.method, undefined, 'published-menu check is read only');
+    return Response.json({ status: 'success', menus: [DEFAULT_MENU], activeMenuId: DEFAULT_MENU.id });
+  });
+  const response = responseRecorder();
+  await handler({ method: 'POST', headers: { cookie: `${ADMIN_COOKIE_NAME}=${token}` }, body: { action: 'saveMenu', menu: { ...DEFAULT_MENU, deleted: true } } }, response);
+  assert.equal(response.statusCode, 409);
+  assert.equal(calls, 1);
+});

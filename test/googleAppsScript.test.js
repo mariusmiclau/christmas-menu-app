@@ -59,6 +59,12 @@ test('Google script saves menus, publishes one, and keeps guest orders working',
   assert.equal(get().activeMenuId, DEFAULT_MENU.id);
   assert.equal(sheets.get('Menus').rows.length, 2, 'publishing updates the existing row');
 
+  assert.equal(post({ ...menuRequest, action: 'saveMenu', menu: { ...DEFAULT_MENU, deleted: true } }).status, 'success');
+  assert.equal(get().menus[0].deleted, true);
+  assert.equal(post({ ...menuRequest, action: 'saveMenu', menu: { ...DEFAULT_MENU, deleted: false } }).status, 'success');
+  assert.equal(get().menus[0].deleted, false);
+  assert.equal(sheets.get('Menus').rows.length, 2, 'deleting and restoring keep the menu record');
+
   const values = [['Guest', 3, 's1', 'm1', 'd1', '', '26 Oct 2026', DEFAULT_MENU.id, DEFAULT_MENU.title]];
   assert.equal(post({ sheetId: menuRequest.sheetId, sheetName: 'Orders', values }).status, 'success');
   assert.equal(sheets.get('Orders').rows.length, 2);

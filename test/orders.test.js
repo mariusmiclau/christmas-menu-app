@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import handler from '../api/orders.js';
-import { saveOrder } from '../src/ordersApi.js';
+import { parseSheetOrder, saveOrder } from '../src/ordersApi.js';
+
+test('changing the public default does not reassign historical or current orders', () => {
+  const oldOrder = parseSheetOrder(['Past guest', 2, 's1', 'm1', '', '', '2025-12-01']);
+  assert.equal(oldOrder.menuId, 'fv-christmas-2025');
+  assert.equal(oldOrder.menuTitle, 'F&V Christmas Dinner');
+  const ppnOrder = parseSheetOrder(['Guest', 3, 's-3-1ilgnhq', 'm-2-49n65z', 'd-4-1f3flwb', '', '2026-10-23', 'ppn-christmas-diner-menu-mvldpwzh', 'PPN Christmas Diner Menu']);
+  assert.equal(ppnOrder.menuId, 'ppn-christmas-diner-menu-mvldpwzh');
+  assert.equal(ppnOrder.main, 'm-2-49n65z');
+});
 
 const row = ['Test guest', 2, 'starter-1', 'main-1', '', 'Medium', '2026-10-23', 'menu-2026', 'Christmas dinner'];
 

@@ -13,16 +13,19 @@ import {
 } from 'lucide-react';
 import { getAdminSession, loginAsAdmin, logoutAdmin } from './adminAuth';
 import FestiveScene from './FestiveScene';
-import { saveOrder } from './ordersApi';
+import { parseSheetOrder, saveOrder } from './ordersApi';
+import { loadSharedMenus, writeSharedMenu } from './menusApi';
 import OrderConfirmation from './OrderConfirmation';
 import { createOrderConfirmation } from './orderReceipt';
 import MenuManager from './MenuManager';
 import {
   DEFAULT_MENU,
+  LEGACY_MENU,
   formatEventDate,
   getSharedMenu,
   itemNeedsPreference,
   readStoredMenus,
+  resolveMenu,
   storeMenus,
 } from './menuData';
 
@@ -362,7 +365,9 @@ export default function ChristmasMenuSelector() {
   const clientMode = Boolean(SHARED_MENU);
   const [menus, setMenus] = useState(() => SHARED_MENU ? [SHARED_MENU] : readStoredMenus());
   const requestedMenuId = new URLSearchParams(window.location.search).get('menu');
-  const [activeMenuId, setActiveMenuId] = useState(() => SHARED_MENU?.id || requestedMenuId || menus[0].id);
+  const [activeMenuId, setActiveMenuId] = useState(() => SHARED_MENU?.id || requestedMenuId || DEFAULT_MENU.id);
+  const [publishedMenuId, setPublishedMenuId] = useState(DEFAULT_MENU.id);
+  const [menuSyncStatus, setMenuSyncStatus] = useState('loading');
   const [order, setOrder] = useState(emptyOrder);
   const [confirmation, setConfirmation] = useState(null);
   const [guests, setGuests] = useState([]);
@@ -373,12 +378,30 @@ export default function ChristmasMenuSelector() {
   const [isAdmin, setIsAdmin] = useState(() => !clientMode && import.meta.env.DEV);
   const [authChecking, setAuthChecking] = useState(() => !clientMode && !import.meta.env.DEV);
 
-  const activeMenu = menus.find((menu) => menu.id === activeMenuId) || menus[0] || DEFAULT_MENU;
-  const activeGuests = guests.filter((guest) => guest.menuId === activeMenu.id || (!guest.menuId && activeMenu.id === DEFAULT_MENU.id));
+  const activeMenu = resolveMenu(menus, activeMenuId);
+  const activeGuests = guests.filter((guest) => guest.menuId === activeMenu.id || (!guest.menuId && activeMenu.id === LEGACY_MENU.id));
 
   useEffect(() => {
     if (!clientMode) storeMenus(menus);
   }, [clientMode, menus]);
+
+  const refreshSharedMenus = useCallback(async () => {
+    if (clientMode) return;
+    try {
+      const state = await loadSharedMenus();
+      setMenus((current) => [
+        ...state.menus,
+        ...current.filter((menu) => !state.menus.some((shared) => shared.id === menu.id)),
+      ]);
+      setPublishedMenuId(state.activeMenuId || DEFAULT_MENU.id);
+      if (!requestedMenuId) setActiveMenuId(state.activeMenuId || DEFAULT_MENU.id);
+      setMenuSyncStatus('ready');
+    } catch {
+      setMenuSyncStatus('unavailable');
+    }
+  }, [clientMode, requestedMenuId]);
+
+  useEffect(() => { refreshSharedMenus(); }, [refreshSharedMenus]);
 
   useEffect(() => {
     if (clientMode || import.meta.env.DEV) return undefined;
@@ -402,17 +425,7 @@ export default function ChristmasMenuSelector() {
       const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}?key=${API_KEY}`);
       if (!response.ok) throw new Error('Failed to load orders');
       const data = await response.json();
-      const loaded = (data.values || []).slice(1).map((row) => ({
-        name: row[0] || '',
-        courses: Number.parseInt(row[1], 10) || 2,
-        starter: row[2] || '',
-        main: row[3] || '',
-        dessert: row[4] || '',
-        steakPreference: row[5] || '',
-        orderDate: row[6] || '',
-        menuId: row[7] || DEFAULT_MENU.id,
-        menuTitle: row[8] || DEFAULT_MENU.title,
-      }));
+      const loaded = (data.values || []).slice(1).map(parseSheetOrder);
       setGuests(loaded);
       setLastUpdate(new Date());
     } catch (error) {
@@ -438,6 +451,7 @@ export default function ChristmasMenuSelector() {
     setIsAdmin(true);
     setMessage('Admin access granted successfully.');
     setViewMode('manage');
+    refreshSharedMenus();
   };
 
   const handleAdminLogout = async () => {
@@ -459,19 +473,22 @@ export default function ChristmasMenuSelector() {
     setViewMode('form');
   };
 
-  const saveMenu = (menu) => {
+  const saveMenu = async (menu) => {
+    await writeSharedMenu('saveMenu', menu);
     setMenus((current) => current.some((item) => item.id === menu.id)
       ? current.map((item) => item.id === menu.id ? menu : item)
       : [...current, menu]);
     setActiveMenuId(menu.id);
+    setMenuSyncStatus('ready');
   };
 
-  const deleteMenu = (menuId) => {
+  const publishMenu = async (menuId) => {
     const menu = menus.find((item) => item.id === menuId);
-    if (!menu || !window.confirm(`Delete the saved menu version “${menu.title}”? Existing Google Sheets orders will not be deleted.`)) return;
-    const remaining = menus.filter((item) => item.id !== menuId);
-    setMenus(remaining);
-    if (activeMenuId === menuId) activateMenu(remaining[0].id);
+    if (!menu) throw new Error('Menu version not found.');
+    await writeSharedMenu('publishMenu', menu);
+    setPublishedMenuId(menu.id);
+    setMenuSyncStatus('ready');
+    activateMenu(menu.id);
   };
 
   const saveOrderToSheet = async (guest) => {
@@ -601,7 +618,7 @@ export default function ChristmasMenuSelector() {
 
         {!clientMode && isAdmin && menus.length > 1 && (
           <div className="max-w-md mx-auto mb-5">
-            <label className="block text-xs uppercase tracking-wider font-bold text-white/70 mb-2 text-center">Active menu version</label>
+            <label className="block text-xs uppercase tracking-wider font-bold text-white/70 mb-2 text-center">Viewing menu version</label>
             <select value={activeMenu.id} onChange={(event) => activateMenu(event.target.value)} className="field font-bold text-center">
               {menus.map((menu) => <option key={menu.id} value={menu.id}>{menu.title}</option>)}
             </select>
@@ -623,7 +640,7 @@ export default function ChristmasMenuSelector() {
         {viewMode === 'confirmation' && confirmation && <OrderConfirmation confirmation={confirmation} onNewOrder={startNewOrder} />}
         {viewMode === 'admin' && !clientMode && !isAdmin && <AdminLogin onLogin={handleAdminLogin} onCancel={() => setViewMode('form')} />}
         {viewMode === 'view' && isAdmin && <OrdersView menu={activeMenu} guests={activeGuests} loading={loading} lastUpdate={lastUpdate} onRefresh={() => loadOrdersFromSheet()} onExport={exportOrders} />}
-        {viewMode === 'manage' && !clientMode && isAdmin && <MenuManager menus={menus} activeMenuId={activeMenu.id} onActivate={activateMenu} onSave={saveMenu} onDelete={deleteMenu} />}
+        {viewMode === 'manage' && !clientMode && isAdmin && <MenuManager menus={menus} activeMenuId={activeMenu.id} publishedMenuId={publishedMenuId} menuSyncStatus={menuSyncStatus} onPublish={publishMenu} onSave={saveMenu} />}
       </div>
     </main>
   );

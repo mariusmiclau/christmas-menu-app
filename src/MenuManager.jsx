@@ -8,7 +8,6 @@ import {
   Plus,
   Save,
   Sparkles,
-  Trash2,
   Upload,
   X,
 } from 'lucide-react';
@@ -55,7 +54,7 @@ async function copyText(value) {
   textArea.remove();
 }
 
-export default function MenuManager({ menus, activeMenuId, onActivate, onSave, onDelete }) {
+export default function MenuManager({ menus, activeMenuId, publishedMenuId, menuSyncStatus, onPublish, onSave }) {
   const editorRef = useRef(null);
   const [draft, setDraft] = useState(() => menuToDraft(null));
   const [editing, setEditing] = useState(false);
@@ -65,6 +64,8 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [notice, setNotice] = useState('');
+  const [noticeError, setNoticeError] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -92,6 +93,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     setPreviewUrl('');
     setImportMessage('');
     setNotice('');
+    setNoticeError(false);
     openEditor();
   };
 
@@ -101,6 +103,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     setPreviewUrl('');
     setImportMessage('');
     setNotice('');
+    setNoticeError(false);
     openEditor();
   };
 
@@ -143,16 +146,18 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     }
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     const title = draft.title.trim();
     const previousMenu = menus.find((menu) => menu.id === draft.id);
     const mains = editorTextToItems(draft.mainsText, 'mains', previousMenu?.mains);
     if (!title) {
       setNotice('Add a name for this menu version.');
+      setNoticeError(true);
       return;
     }
     if (!mains.length) {
       setNotice('Add at least one main course.');
+      setNoticeError(true);
       return;
     }
 
@@ -169,15 +174,40 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
       mains,
       desserts: editorTextToItems(draft.dessertsText, 'desserts', previousMenu?.desserts),
     };
-    onSave(menu);
-    setDraft(menuToDraft(menu));
-    setNotice('Menu version saved. Its client link is ready to share.');
-    setEditing(false);
+    setBusy(true);
+    try {
+      await onSave(menu);
+      setDraft(menuToDraft(menu));
+      setNotice('Menu version saved for all admin devices. Its client link is ready to share.');
+      setNoticeError(false);
+      setEditing(false);
+    } catch (error) {
+      setNotice(error.message || 'Menu version could not be saved.');
+      setNoticeError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publish = async (menu) => {
+    setBusy(true);
+    setNotice('');
+    try {
+      await onPublish(menu.id);
+      setNotice(`“${menu.title}” is now the menu everyone sees on the main link.`);
+      setNoticeError(false);
+    } catch (error) {
+      setNotice(error.message || 'The menu could not be published.');
+      setNoticeError(true);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const copyLink = async (menu) => {
     await copyText(getClientLink(menu));
     setNotice(`Client link copied for “${menu.title}”.`);
+    setNoticeError(false);
   };
 
   const duplicateMenu = (menu) => {
@@ -186,6 +216,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
     setPreviewUrl('');
     setImportMessage('');
     setNotice('Edit the copy, then save it as a new client version.');
+    setNoticeError(false);
     openEditor();
   };
 
@@ -206,11 +237,13 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
         </div>
 
         {notice && (
-          <div className="mx-6 md:mx-8 mt-5 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-start gap-2">
-            <CheckCircle2 size={19} className="mt-0.5 shrink-0" />
+          <div role={noticeError ? 'alert' : 'status'} className={`mx-6 md:mx-8 mt-5 px-4 py-3 rounded-xl border flex items-start gap-2 ${noticeError ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+            {!noticeError && <CheckCircle2 size={19} className="mt-0.5 shrink-0" />}
             <span>{notice}</span>
           </div>
         )}
+
+        {menuSyncStatus === 'unavailable' && <p role="alert" className="mx-6 md:mx-8 mt-5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-semibold">Shared menu storage is unavailable. Saving or publishing will show an error until the Google Apps Script setup is complete.</p>}
 
         <div className="p-6 md:p-8 grid md:grid-cols-2 gap-4">
           {menus.map((menu) => (
@@ -219,7 +252,8 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
                 <div>
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <h3 className="text-xl font-extrabold text-slate-900">{menu.title}</h3>
-                    {menu.id === activeMenuId && <span className="text-xs font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-700 text-white">Active</span>}
+                    {menu.id === activeMenuId && <span className="text-xs font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-700 text-white">Viewing</span>}
+                    {menu.id === publishedMenuId && <span className="text-xs font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-blue-700 text-white">Published</span>}
                   </div>
                   <p className="text-sm text-slate-600">{formatEventDate(menu.eventDate)}</p>
                   <p className="text-sm text-slate-500 mt-1">{menu.starters.length} starters · {menu.mains.length} mains · {menu.desserts.length} desserts</p>
@@ -227,14 +261,11 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => onActivate(menu.id)} className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-bold hover:bg-slate-700">Use version</button>
+                <button type="button" disabled={busy} onClick={() => publish(menu)} className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 disabled:opacity-50">Use this menu</button>
                 <button type="button" onClick={() => copyLink(menu)} className="px-3 py-2 rounded-lg bg-blue-700 text-white text-sm font-bold hover:bg-blue-800 flex items-center justify-center gap-1.5"><Copy size={15} /> Copy client link</button>
                 <a href={getClientLink(menu)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 flex items-center justify-center gap-1.5"><ExternalLink size={15} /> Preview</a>
                 <button type="button" onClick={() => beginEdit(menu)} className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 flex items-center justify-center gap-1.5"><Pencil size={15} /> Edit</button>
                 <button type="button" onClick={() => duplicateMenu(menu)} className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 flex items-center justify-center gap-1.5"><Copy size={15} /> Duplicate</button>
-                {menus.length > 1 && (
-                  <button type="button" onClick={() => onDelete(menu.id)} className="px-3 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-bold hover:bg-red-50 flex items-center justify-center gap-1.5"><Trash2 size={15} /> Delete</button>
-                )}
               </div>
             </article>
           ))}
@@ -330,7 +361,7 @@ export default function MenuManager({ menus, activeMenuId, onActivate, onSave, o
 
             <div className="flex flex-col sm:flex-row justify-end gap-3 border-t border-slate-200 pt-6">
               <button type="button" onClick={() => setEditing(false)} className="px-5 py-3 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={saveDraft} className="px-6 py-3 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800 flex items-center justify-center gap-2"><Save size={19} /> Save menu version</button>
+              <button type="button" disabled={busy} onClick={saveDraft} className="px-6 py-3 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800 disabled:opacity-50 flex items-center justify-center gap-2"><Save size={19} /> {busy ? 'Saving…' : 'Save menu version'}</button>
             </div>
           </div>
         </section>

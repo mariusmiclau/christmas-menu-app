@@ -1,3 +1,5 @@
+import { PUBLISHED_MENU } from './publishedMenu.js';
+
 const STORAGE_KEY = 'fv-menu-versions-v1';
 const IMPORT_FOOTER_FRAGMENT = /(?:connections?\s+and\s+achievements|bring\s+the\s+\d{4}\s+network|network(?:ing)?\s+calendar|calendar\s+to\s+a\s+close)/i;
 
@@ -29,7 +31,7 @@ export function sanitiseMenu(menu) {
   };
 }
 
-export const DEFAULT_MENU = {
+export const LEGACY_MENU = {
   id: 'fv-christmas-2025',
   title: 'F&V Christmas Dinner',
   eventDate: '2025-12-03',
@@ -58,14 +60,29 @@ export const DEFAULT_MENU = {
   ],
 };
 
+export const DEFAULT_MENU = PUBLISHED_MENU;
+
+export function resolveMenu(menus, requestedId) {
+  return menus.find((menu) => menu.id === requestedId)
+    || menus.find((menu) => menu.id === DEFAULT_MENU.id)
+    || menus[0]
+    || DEFAULT_MENU;
+}
+
 export function readStoredMenus() {
+  let saved = [];
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(stored) && stored.length) return stored.map(sanitiseMenu);
+    if (Array.isArray(stored)) saved = stored.filter((menu) => menu?.id).map(sanitiseMenu);
   } catch (error) {
     console.warn('Could not read saved menu versions', error);
   }
-  return [DEFAULT_MENU];
+  // Add published menus without replacing locally edited versions or other drafts.
+  const menus = [...saved];
+  for (const published of [DEFAULT_MENU, LEGACY_MENU]) {
+    if (!menus.some((menu) => menu.id === published.id)) menus.push(published);
+  }
+  return menus;
 }
 
 export function storeMenus(menus) {
